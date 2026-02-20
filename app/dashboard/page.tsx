@@ -118,7 +118,9 @@ export default async function DashboardPage() {
                   ? `Venció hace ${Math.abs(membershipStatus.daysRemaining)} días`
                   : membershipStatus && membershipStatus.daysRemaining <= 7
                     ? `Vence en ${membershipStatus.daysRemaining} días`
-                    : `Vence en ${membershipStatus.daysRemaining} días`}
+                    : membershipStatus
+                      ? `Vence en ${membershipStatus.daysRemaining} días`
+                      : "Contacta al administrador"}
             </p>
           </div>
 
