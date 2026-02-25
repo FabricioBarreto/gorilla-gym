@@ -7,6 +7,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "loading" | "done">(
+    "idle",
+  );
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,6 +37,27 @@ export default function LoginPage() {
     }
   };
 
+  const handleUpdate = async () => {
+    setUpdateStatus("loading");
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          reg.waiting?.postMessage("SKIP_WAITING");
+        }
+      }
+      setUpdateStatus("done");
+      setTimeout(() => window.location.reload(), 1000);
+    } catch {
+      window.location.reload();
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -50,7 +74,6 @@ export default function LoginPage() {
           overflow: hidden;
         }
 
-        /* Diagonal background split */
         .login-root::before {
           content: '';
           position: absolute;
@@ -58,7 +81,6 @@ export default function LoginPage() {
           background: linear-gradient(135deg, #0a0a0a 50%, #111 50%);
         }
 
-        /* Texture grain */
         .login-root::after {
           content: '';
           position: absolute;
@@ -68,17 +90,13 @@ export default function LoginPage() {
           pointer-events: none;
         }
 
-        /* Accent bar top */
         .accent-bar {
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
+          top: 0; left: 0; right: 0;
           height: 3px;
           background: linear-gradient(90deg, #22c55e, #16a34a, #15803d);
         }
 
-        /* Left decorative panel */
         .deco-panel {
           display: none;
           position: relative;
@@ -96,9 +114,7 @@ export default function LoginPage() {
           }
         }
 
-        .deco-inner {
-          max-width: 400px;
-        }
+        .deco-inner { max-width: 400px; }
 
         .deco-tag {
           display: inline-block;
@@ -121,10 +137,7 @@ export default function LoginPage() {
           margin-bottom: 24px;
         }
 
-        .deco-headline span {
-          color: #22c55e;
-          display: block;
-        }
+        .deco-headline span { color: #22c55e; display: block; }
 
         .deco-sub {
           font-size: 15px;
@@ -143,7 +156,6 @@ export default function LoginPage() {
           border-top: 1px solid #1a1a1a;
         }
 
-        .stat-item {}
         .stat-num {
           font-family: 'Bebas Neue', sans-serif;
           font-size: 36px;
@@ -158,7 +170,6 @@ export default function LoginPage() {
           margin-top: 2px;
         }
 
-        /* Right form panel */
         .form-panel {
           position: relative;
           z-index: 1;
@@ -170,46 +181,32 @@ export default function LoginPage() {
         }
 
         @media (min-width: 1024px) {
-          .form-panel {
-            width: 480px;
-            flex-shrink: 0;
-          }
+          .form-panel { width: 480px; flex-shrink: 0; }
         }
 
         .form-card {
           width: 100%;
           max-width: 400px;
+          animation: fadeUp 0.4s ease both;
         }
 
-        /* Mobile logo */
         .mobile-logo {
           text-align: center;
           margin-bottom: 40px;
         }
 
-        @media (min-width: 1024px) {
-          .mobile-logo { display: none; }
-        }
+        @media (min-width: 1024px) { .mobile-logo { display: none; } }
 
-        .logo-icon {
-          font-size: 40px;
-          display: block;
-          margin-bottom: 8px;
-        }
-
+        .logo-icon { font-size: 40px; display: block; margin-bottom: 8px; }
         .logo-text {
           font-family: 'Bebas Neue', sans-serif;
           font-size: 36px;
           color: #fff;
           letter-spacing: 0.1em;
         }
-
         .logo-text span { color: #22c55e; }
 
-        /* Form heading */
-        .form-heading {
-          margin-bottom: 36px;
-        }
+        .form-heading { margin-bottom: 36px; }
 
         .form-label-tag {
           font-size: 11px;
@@ -228,7 +225,6 @@ export default function LoginPage() {
           line-height: 1;
         }
 
-        /* Error */
         .error-box {
           background: #ff000011;
           border: 1px solid #ff000044;
@@ -240,10 +236,7 @@ export default function LoginPage() {
           letter-spacing: 0.01em;
         }
 
-        /* Field */
-        .field {
-          margin-bottom: 20px;
-        }
+        .field { margin-bottom: 20px; }
 
         .field-label {
           display: block;
@@ -271,14 +264,12 @@ export default function LoginPage() {
         }
 
         .field-input::placeholder { color: #333; }
-
         .field-input:focus {
           border-color: #22c55e;
           border-bottom-color: #22c55e;
           background: #0d0d0d;
         }
 
-        /* Submit button */
         .submit-btn {
           width: 100%;
           padding: 16px;
@@ -295,21 +286,14 @@ export default function LoginPage() {
           transition: background 0.2s, transform 0.1s;
         }
 
-        .submit-btn:hover:not(:disabled) {
-          background: #16a34a;
-        }
-
-        .submit-btn:active:not(:disabled) {
-          transform: scale(0.99);
-        }
-
+        .submit-btn:hover:not(:disabled) { background: #16a34a; }
+        .submit-btn:active:not(:disabled) { transform: scale(0.99); }
         .submit-btn:disabled {
           background: #1a3a1a;
           color: #2a5a2a;
           cursor: not-allowed;
         }
 
-        /* Loading bar */
         .submit-btn.loading::after {
           content: '';
           position: absolute;
@@ -321,11 +305,8 @@ export default function LoginPage() {
           animation: loadbar 1s infinite;
         }
 
-        @keyframes loadbar {
-          to { left: 100%; }
-        }
+        @keyframes loadbar { to { left: 100%; } }
 
-        /* Footer note */
         .form-footer {
           margin-top: 28px;
           text-align: center;
@@ -334,10 +315,41 @@ export default function LoginPage() {
           letter-spacing: 0.05em;
         }
 
-        /* Animate in */
-        .form-card {
-          animation: fadeUp 0.4s ease both;
+        /* Botón actualizar */
+        .update-btn {
+          position: fixed;
+          bottom: 16px;
+          right: 16px;
+          z-index: 50;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          background: #111;
+          border: 1px solid #222;
+          color: #555;
+          font-family: 'Barlow', sans-serif;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          letter-spacing: 0.05em;
         }
+
+        .update-btn:hover:not(:disabled) {
+          border-color: #22c55e44;
+          color: #22c55e;
+          background: #0d0d0d;
+        }
+
+        .update-btn:disabled { cursor: wait; opacity: 0.6; }
+
+        .update-btn.done {
+          border-color: #22c55e44;
+          color: #22c55e;
+        }
+
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
@@ -361,15 +373,15 @@ export default function LoginPage() {
               dispositivo.
             </p>
             <div className="deco-stats">
-              <div className="stat-item">
+              <div>
                 <div className="stat-num">100+</div>
                 <div className="stat-label">Ejercicios</div>
               </div>
-              <div className="stat-item">
+              <div>
                 <div className="stat-num">24/7</div>
                 <div className="stat-label">Acceso</div>
               </div>
-              <div className="stat-item">
+              <div>
                 <div className="stat-num">PWA</div>
                 <div className="stat-label">Offline</div>
               </div>
@@ -380,7 +392,6 @@ export default function LoginPage() {
         {/* Right form panel */}
         <div className="form-panel">
           <div className="form-card">
-            {/* Mobile logo */}
             <div className="mobile-logo">
               <span className="logo-icon">🦍</span>
               <div className="logo-text">
@@ -442,6 +453,71 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+
+        {/* Botón actualizar app — esquina inferior derecha */}
+        <button
+          onClick={handleUpdate}
+          disabled={updateStatus === "loading"}
+          className={`update-btn${updateStatus === "done" ? " done" : ""}`}
+          title="Limpiar caché y descargar última versión"
+        >
+          {updateStatus === "loading" ? (
+            <>
+              <svg
+                className="spin"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Actualizando...
+            </>
+          ) : updateStatus === "done" ? (
+            <>
+              <svg
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              Actualizado
+            </>
+          ) : (
+            <>
+              <svg
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Actualizar app
+            </>
+          )}
+        </button>
       </div>
     </>
   );

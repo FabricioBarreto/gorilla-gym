@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OfflineIndicator } from "./OfflineIndicator";
+import { UpdateAppButton } from "@/components/UpdateAppButton";
 
 interface UserNavProps {
   userName: string;
@@ -32,30 +33,29 @@ export function UserNav({ userName }: UserNavProps) {
                 href="/dashboard"
                 className="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
               >
-                🏠 Dashboard
+                Dashboard
               </Link>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <div className="hidden md:block text-right">
                 <p className="text-sm font-medium text-white">{userName}</p>
                 <p className="text-xs text-gray-400">Usuario</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <Link
-                  href="/dashboard/profile"
-                  className="p-2 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-                  title="Mi perfil"
-                >
-                  Mi Perfil 👤
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-                >
-                  Salir
-                </button>
-              </div>
+              <UpdateAppButton />
+              <Link
+                href="/dashboard/profile"
+                className="p-2 rounded-md text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                title="Mi perfil"
+              >
+                Mi Perfil
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+              >
+                Salir
+              </button>
             </div>
           </div>
 
@@ -64,19 +64,19 @@ export function UserNav({ userName }: UserNavProps) {
               href="/dashboard"
               className="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
             >
-              🏠 Dashboard
+              Dashboard
             </Link>
             <Link
               href="/dashboard/exercises"
               className="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
             >
-              📚 Ejercicios
+              Ejercicios
             </Link>
             <Link
               href="/dashboard/profile"
               className="block px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
             >
-              👤 Mi Perfil
+              Mi Perfil
             </Link>
           </div>
         </div>

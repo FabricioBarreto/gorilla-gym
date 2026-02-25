@@ -1,9 +1,8 @@
 // public/sw.js
-const CACHE_NAME = "gorila-gym-v1";
-const STATIC_CACHE = "gorila-gym-static-v1";
-const DYNAMIC_CACHE = "gorila-gym-dynamic-v1";
+const CACHE_VERSION = "gorila-gym-v2026022401";
+const STATIC_CACHE = `gorila-gym-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `gorila-gym-dynamic-${CACHE_VERSION}`;
 
-// Recursos estáticos para cachear
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -13,42 +12,52 @@ const STATIC_ASSETS = [
   "/favicon.ico",
 ];
 
-// Instalar Service Worker
 self.addEventListener("install", (event) => {
-  console.log("[SW] Instalando Service Worker...");
+  console.log("[SW] Instalando versión:", CACHE_VERSION);
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log("[SW] Cacheando recursos estáticos");
-      return cache.addAll(STATIC_ASSETS);
-    }),
+    caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_ASSETS)),
   );
   self.skipWaiting();
 });
 
-// Activar Service Worker
 self.addEventListener("activate", (event) => {
-  console.log("[SW] Activando Service Worker...");
+  console.log("[SW] Activando versión:", CACHE_VERSION);
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys
           .filter((key) => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
-          .map((key) => caches.delete(key)),
-      );
-    }),
+          .map((key) => {
+            console.log("[SW] Eliminando cache viejo:", key);
+            return caches.delete(key);
+          }),
+      ),
+    ),
   );
   self.clients.claim();
 });
 
-// Interceptar peticiones
+// Escuchar mensaje de forzar actualización
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+  if (event.data === "CLEAR_CACHE") {
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => {
+        event.ports[0]?.postMessage("CACHE_CLEARED");
+      });
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignorar peticiones que no sean GET
   if (request.method !== "GET") return;
 
-  // Ignorar peticiones a APIs externas (excepto Supabase)
   if (
     !url.origin.includes(self.location.origin) &&
     !url.origin.includes("supabase.co")
@@ -56,33 +65,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Nunca cachear rutas de API ni páginas de admin
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin")) {
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
-      // Si está en cache, devolver pero actualizar en background
       if (cachedResponse) {
-        // Network First para APIs de Supabase
         if (url.origin.includes("supabase.co")) {
           return fetch(request)
             .then((response) => {
-              if (response && response.status === 200) {
-                const responseClone = response.clone();
-                caches.open(DYNAMIC_CACHE).then((cache) => {
-                  cache.put(request, responseClone);
-                });
+              if (response?.status === 200) {
+                caches
+                  .open(DYNAMIC_CACHE)
+                  .then((cache) => cache.put(request, response.clone()));
               }
               return response;
             })
             .catch(() => cachedResponse);
         }
-
-        // Cache First para recursos estáticos
         return cachedResponse;
       }
 
-      // Si no está en cache, hacer fetch y cachear
       return fetch(request)
         .then((response) => {
-          // Solo cachear respuestas exitosas
           if (
             !response ||
             response.status !== 200 ||
@@ -90,25 +97,19 @@ self.addEventListener("fetch", (event) => {
           ) {
             return response;
           }
-
-          const responseClone = response.clone();
-
-          // Cachear imágenes y recursos estáticos
           if (
             url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/) ||
             url.pathname.startsWith("/dashboard") ||
             url.origin.includes("supabase.co")
           ) {
-            caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
+            caches
+              .open(DYNAMIC_CACHE)
+              .then((cache) => cache.put(request, response.clone()));
           }
-
           return response;
         })
         .catch(() => {
-          // Si falla y es una página, devolver página offline
-          if (request.headers.get("accept").includes("text/html")) {
+          if (request.headers.get("accept")?.includes("text/html")) {
             return caches.match("/dashboard");
           }
         });
@@ -116,13 +117,8 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Sincronización en background
 self.addEventListener("sync", (event) => {
-  console.log("[SW] Background sync:", event.tag);
   if (event.tag === "sync-data") {
-    event.waitUntil(
-      // Aquí se puede implementar sincronización de datos
-      Promise.resolve(),
-    );
+    event.waitUntil(Promise.resolve());
   }
 });

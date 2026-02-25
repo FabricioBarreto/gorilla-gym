@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { UpdateAppButton } from "@/components/UpdateAppButton";
 
 interface AdminNavProps {
   userName: string;
@@ -55,7 +56,8 @@ export function AdminNav({ userName }: AdminNavProps) {
             ))}
           </div>
 
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
+            <UpdateAppButton />
             <span className="text-gray-300 text-sm">👤 {userName}</span>
             <button
               onClick={handleLogout}
@@ -124,12 +126,15 @@ export function AdminNav({ userName }: AdminNavProps) {
           </div>
           <div className="border-t border-gray-700 px-4 py-3 flex items-center justify-between">
             <span className="text-gray-300 text-sm">👤 {userName}</span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-            >
-              Salir
-            </button>
+            <div className="flex items-center space-x-2">
+              <UpdateAppButton />
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Salir
+              </button>
+            </div>
           </div>
         </div>
       )}
