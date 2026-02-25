@@ -3,7 +3,7 @@ import { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Gorilla GYM",
-    short_name: "GorilaGYM",
+    short_name: "gorillaGYM",
     description:
       "Sistema de gestión para Gorilla GYM - Control de alumnos, cuotas y rutinas",
     start_url: "/",

@@ -179,7 +179,6 @@ export default async function DashboardPage() {
               className="group bg-gray-800 border-2 border-gray-700 hover:border-green-500 rounded-xl p-8 transition-all hover:scale-105 block"
             >
               <div className="flex items-center justify-between mb-4">
-                <span className="text-6xl">📚</span>
                 <span className="text-green-400 group-hover:text-green-300 text-2xl">
                   →
                 </span>

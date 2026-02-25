@@ -21,28 +21,47 @@ export default async function MemberDetailPage({
   const member = await prisma.profile.findUnique({ where: { id } });
   if (!member) redirect("/admin/members");
 
-  const [membership, allMemberships, routineAssignment, availableRoutines] =
-    await Promise.all([
-      prisma.membership.findFirst({
-        where: { userId: id, status: "active" },
-        orderBy: { endDate: "desc" },
-      }),
-      prisma.membership.findMany({
-        where: { userId: id },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.routineAssignment.findFirst({
-        where: { userId: id },
-        orderBy: { assignedAt: "desc" },
-        include: { routine: { select: { id: true, name: true } } },
-      }),
-      prisma.routine.findMany({
-        select: { id: true, name: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+  const [
+    membership,
+    allMemberships,
+    routineAssignment,
+    availableRoutines,
+    dbPrices,
+  ] = await Promise.all([
+    prisma.membership.findFirst({
+      where: { userId: id, status: "active" },
+      orderBy: { endDate: "desc" },
+    }),
+    prisma.membership.findMany({
+      where: { userId: id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.routineAssignment.findFirst({
+      where: { userId: id },
+      orderBy: { assignedAt: "desc" },
+      include: { routine: { select: { id: true, name: true } } },
+    }),
+    prisma.routine.findMany({
+      select: { id: true, name: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.membershipPrice.findMany(),
+  ]);
 
-  // Mapear camelCase de Prisma → snake_case que esperan los componentes
+  // Mapear precios de DB → { quincenal: 8000, mensual: 15000, ... }
+  const pricesMap = Object.fromEntries(
+    dbPrices.map((p) => [p.planType, p.price]),
+  );
+
+  // Fallback si no hay precios en DB
+  const prices = {
+    quincenal: 8000,
+    mensual: 15000,
+    trimestral: 40000,
+    anual: 150000,
+    ...pricesMap,
+  };
+
   const memberForComponent = {
     ...member,
     full_name: member.fullName,
@@ -80,6 +99,7 @@ export default async function MemberDetailPage({
           <MemberMembershipSimple
             membership={membershipForComponent}
             memberId={member.id}
+            prices={prices}
           />
           <AssignRoutineButton
             memberId={member.id}

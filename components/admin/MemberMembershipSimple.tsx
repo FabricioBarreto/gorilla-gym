@@ -15,11 +15,13 @@ interface Membership {
 interface MemberMembershipSimpleProps {
   membership: Membership | null;
   memberId: string;
+  prices: Record<string, number>;
 }
 
 export function MemberMembershipSimple({
   membership,
   memberId,
+  prices,
 }: MemberMembershipSimpleProps) {
   const router = useRouter();
   const [showRenewForm, setShowRenewForm] = useState(false);
@@ -30,19 +32,14 @@ export function MemberMembershipSimple({
     "efectivo" | "transferencia"
   >("efectivo");
 
-  const planPrices = {
-    quincenal: 8000,
-    mensual: 15000,
-    trimestral: 40000,
-    anual: 150000,
-  };
-  const planLabels = {
+  const planLabels: Record<string, string> = {
     quincenal: "Quincenal",
     mensual: "Mensual",
     trimestral: "Trimestral",
     anual: "Anual",
   };
-  const planDurations = {
+
+  const planDurations: Record<string, number> = {
     quincenal: 15,
     mensual: 30,
     trimestral: 90,
@@ -121,13 +118,13 @@ export function MemberMembershipSimple({
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">💳 Membresía</h2>
+        <h2 className="text-xl font-bold text-white">Membresia</h2>
         {!showRenewForm && (
           <button
             onClick={() => setShowRenewForm(true)}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
           >
-            {membership ? "🔄 Renovar" : "➕ Crear"}
+            {membership ? "Renovar" : "Crear"}
           </button>
         )}
       </div>
@@ -142,15 +139,15 @@ export function MemberMembershipSimple({
         <div className="space-y-6">
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
             <p className="text-blue-300 text-sm">
-              ℹ️ Selecciona el tipo de membresía y método de pago. La fecha de
-              inicio será hoy.
+              Selecciona el tipo de membresia y metodo de pago. La fecha de
+              inicio sera hoy.
             </p>
           </div>
 
-          {/* Método de Pago */}
+          {/* Metodo de Pago */}
           <div>
             <label className="block text-white font-medium mb-3">
-              💰 Método de Pago
+              Metodo de Pago
             </label>
             <div className="grid grid-cols-2 gap-3">
               {(["efectivo", "transferencia"] as const).map((method) => (
@@ -161,11 +158,8 @@ export function MemberMembershipSimple({
                   className={`p-4 rounded-lg border-2 transition-all ${paymentMethod === method ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
                 >
                   <div className="flex items-center justify-center space-x-2">
-                    <span className="text-2xl">
-                      {method === "efectivo" ? "💵" : "🏦"}
-                    </span>
                     <span className="text-white font-medium capitalize">
-                      {method}
+                      {method === "efectivo" ? "Efectivo" : "Transferencia"}
                     </span>
                   </div>
                 </button>
@@ -176,47 +170,41 @@ export function MemberMembershipSimple({
           {/* Planes */}
           <div>
             <label className="block text-white font-medium mb-3">
-              📋 Plan de Membresía
+              Plan de Membresia
             </label>
             <div className="space-y-3">
-              {Object.entries(planPrices).map(([plan, price]) => (
+              {Object.entries(prices).map(([plan, price]) => (
                 <button
                   key={plan}
                   type="button"
                   onClick={() => setSelectedPlan(plan)}
                   className={`w-full p-4 rounded-lg border-2 transition-all text-left ${selectedPlan === plan ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <span
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === plan ? "border-green-500 bg-green-500" : "border-gray-500"}`}
-                        >
-                          {selectedPlan === plan && (
-                            <span className="text-white text-xs">✓</span>
-                          )}
-                        </span>
-                        <p className="text-white font-bold text-lg">
-                          {planLabels[plan as keyof typeof planLabels]}
-                        </p>
-                      </div>
-                      <div className="ml-8 space-y-1">
-                        <p className="text-green-400 font-bold text-xl">
-                          ${price.toLocaleString()}
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                          Duración:{" "}
-                          {planDurations[plan as keyof typeof planDurations]}{" "}
-                          días
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                          Vence:{" "}
-                          {new Date(calculateEndDate(plan)).toLocaleDateString(
-                            "es-AR",
-                          )}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex items-center space-x-3 mb-2">
+                    <span
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === plan ? "border-green-500 bg-green-500" : "border-gray-500"}`}
+                    >
+                      {selectedPlan === plan && (
+                        <span className="text-white text-xs">✓</span>
+                      )}
+                    </span>
+                    <p className="text-white font-bold text-lg">
+                      {planLabels[plan] || plan}
+                    </p>
+                  </div>
+                  <div className="ml-8 space-y-1">
+                    <p className="text-green-400 font-bold text-xl">
+                      ${price.toLocaleString()}
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Duracion: {planDurations[plan] || "—"} dias
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Vence:{" "}
+                      {new Date(calculateEndDate(plan)).toLocaleDateString(
+                        "es-AR",
+                      )}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -242,8 +230,8 @@ export function MemberMembershipSimple({
               {loading
                 ? "Procesando..."
                 : membership
-                  ? "Confirmar Renovación"
-                  : "Crear Membresía"}
+                  ? "Confirmar Renovacion"
+                  : "Crear Membresia"}
             </button>
           </div>
         </div>
@@ -258,7 +246,7 @@ export function MemberMembershipSimple({
                   : "bg-green-500/10 border-green-500"
             }`}
           >
-            <p className="text-gray-300 text-sm mb-2">Estado de Membresía</p>
+            <p className="text-gray-300 text-sm mb-2">Estado de Membresia</p>
             <p className={`text-4xl font-bold mb-2 ${status.color}`}>
               {status.icon}
             </p>
@@ -270,13 +258,10 @@ export function MemberMembershipSimple({
             <div className="bg-gray-700/50 rounded-lg p-4">
               <p className="text-gray-400 text-sm mb-1">Plan</p>
               <p className="text-white font-bold text-lg">
-                {planLabels[membership.plan_type as keyof typeof planLabels]}
+                {planLabels[membership.plan_type] || membership.plan_type}
               </p>
               <p className="text-green-400 font-semibold">
-                $
-                {planPrices[
-                  membership.plan_type as keyof typeof planPrices
-                ]?.toLocaleString()}
+                ${prices[membership.plan_type]?.toLocaleString() || "—"}
               </p>
             </div>
             <div className="bg-gray-700/50 rounded-lg p-4">
@@ -288,21 +273,16 @@ export function MemberMembershipSimple({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-700/50 rounded-lg p-4">
-              <p className="text-gray-400 text-sm mb-1">Inicio de Membresía</p>
+              <p className="text-gray-400 text-sm mb-1">Inicio de Membresia</p>
               <p className="text-white">
                 {new Date(membership.start_date).toLocaleDateString("es-AR")}
               </p>
             </div>
             {membership.payment_method && (
               <div className="bg-gray-700/50 rounded-lg p-4">
-                <p className="text-gray-400 text-sm mb-1">Método de Pago</p>
-                <p className="text-white flex items-center space-x-2">
-                  <span>
-                    {membership.payment_method === "efectivo" ? "💵" : "🏦"}
-                  </span>
-                  <span className="capitalize">
-                    {membership.payment_method}
-                  </span>
+                <p className="text-gray-400 text-sm mb-1">Metodo de Pago</p>
+                <p className="text-white capitalize">
+                  {membership.payment_method}
                 </p>
               </div>
             )}
@@ -310,15 +290,14 @@ export function MemberMembershipSimple({
         </div>
       ) : (
         <div className="text-center py-12">
-          <div className="mb-4 text-6xl">🏋️</div>
           <p className="text-gray-400 text-lg mb-4">
-            Este alumno no tiene membresía
+            Este alumno no tiene membresia
           </p>
           <button
             onClick={() => setShowRenewForm(true)}
             className="text-green-400 hover:text-green-300 font-medium"
           >
-            Crear membresía →
+            Crear membresia →
           </button>
         </div>
       )}

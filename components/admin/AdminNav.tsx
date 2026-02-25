@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { UpdateAppButton } from "@/components/UpdateAppButton";
+import { InstallAppButton } from "@/components/InstallAppButton";
 
 interface AdminNavProps {
   userName: string;
@@ -27,7 +28,7 @@ export function AdminNav({ userName }: AdminNavProps) {
     { href: "/admin/exercises", label: "Ejercicios", icon: "🏋️" },
     { href: "/admin/routines", label: "Rutinas", icon: "📋" },
     { href: "/admin/admins", label: "Admins", icon: "👑" },
-    { href: "/admin/settings", label: "Configuración", icon: "⚙️" },
+    { href: "/admin/settings", label: "Configuracion", icon: "⚙️" },
   ];
 
   return (
@@ -35,7 +36,6 @@ export function AdminNav({ userName }: AdminNavProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/admin" className="flex items-center space-x-2">
-            <span className="text-3xl">🦍</span>
             <span className="text-white font-bold text-xl">Gorilla GYM</span>
           </Link>
 
@@ -57,8 +57,8 @@ export function AdminNav({ userName }: AdminNavProps) {
           </div>
 
           <div className="hidden md:flex items-center space-x-3">
-            <UpdateAppButton />
-            <span className="text-gray-300 text-sm">👤 {userName}</span>
+            <InstallAppButton />
+            <span className="text-gray-300 text-sm">{userName}</span>
             <button
               onClick={handleLogout}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -70,7 +70,7 @@ export function AdminNav({ userName }: AdminNavProps) {
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden text-gray-300 hover:text-white p-2 rounded-md focus:outline-none"
-            aria-label="Abrir menú"
+            aria-label="Abrir menu"
           >
             {menuOpen ? (
               <svg
@@ -125,9 +125,9 @@ export function AdminNav({ userName }: AdminNavProps) {
             ))}
           </div>
           <div className="border-t border-gray-700 px-4 py-3 flex items-center justify-between">
-            <span className="text-gray-300 text-sm">👤 {userName}</span>
+            <span className="text-gray-300 text-sm">{userName}</span>
             <div className="flex items-center space-x-2">
-              <UpdateAppButton />
+              <InstallAppButton />
               <button
                 onClick={handleLogout}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"

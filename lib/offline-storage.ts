@@ -1,6 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from "idb";
 
-interface GorilaGymDB extends DBSchema {
+interface gorillaGymDB extends DBSchema {
   routines: {
     key: string;
     value: any;
@@ -22,12 +22,12 @@ interface GorilaGymDB extends DBSchema {
   };
 }
 
-let db: IDBPDatabase<GorilaGymDB> | null = null;
+let db: IDBPDatabase<gorillaGymDB> | null = null;
 
 async function getDB() {
   if (db) return db;
 
-  db = await openDB<GorilaGymDB>("gorila-gym", 1, {
+  db = await openDB<gorillaGymDB>("gorilla-gym", 1, {
     upgrade(database) {
       // Crear stores si no existen
       if (!database.objectStoreNames.contains("routines")) {

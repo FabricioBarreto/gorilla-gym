@@ -42,7 +42,7 @@ export default async function AdminExercisesPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">
-              📚 Biblioteca de Ejercicios
+              Biblioteca de Ejercicios
             </h1>
             <p className="text-gray-400">
               {exercises.length} ejercicios en {muscleGroups.length} grupos

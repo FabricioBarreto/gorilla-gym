@@ -1,7 +1,7 @@
 // public/sw.js
-const CACHE_VERSION = "gorila-gym-v2026022401";
-const STATIC_CACHE = `gorila-gym-static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `gorila-gym-dynamic-${CACHE_VERSION}`;
+const CACHE_VERSION = `gorila-gym-${Date.now()}`;
+const STATIC_CACHE = `gorilla-gym-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `gorilla-gym-dynamic-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
   "/",
@@ -17,7 +17,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_ASSETS)),
   );
-  self.skipWaiting();
+  // NO llamar skipWaiting aquí — esperar confirmación del usuario
 });
 
 self.addEventListener("activate", (event) => {
@@ -37,7 +37,6 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Escuchar mensaje de forzar actualización
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") {
     self.skipWaiting();
@@ -65,7 +64,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Nunca cachear rutas de API ni páginas de admin
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin")) {
     return;
   }
