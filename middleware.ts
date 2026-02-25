@@ -1,74 +1,35 @@
-import { createServerClient } from "@supabase/ssr";
+// middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
+import { jwtVerify } from "jose";
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET ??
+    "gorilla-gym-super-secret-key-change-in-production-2026",
+);
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
+  const token = request.cookies.get("auth-token")?.value;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
+  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Proteger rutas de admin
-  if (request.nextUrl.pathname.startsWith("/admin") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Proteger rutas de dashboard de usuario
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Si está en login y ya tiene sesión, redirigir al dashboard correspondiente
-  if (request.nextUrl.pathname === "/login" && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", request.url));
+  if (isAdminRoute || isDashboardRoute) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+
+    try {
+      await jwtVerify(token, JWT_SECRET);
+    } catch {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (public folder)
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

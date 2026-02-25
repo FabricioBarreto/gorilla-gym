@@ -1,34 +1,17 @@
-import { createAdminSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { NewExerciseForm } from "@/components/admin/NewExerciseForm";
 import Link from "next/link";
 
 export default async function NewExercisePage() {
-  const supabase = await createAdminSupabaseClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    redirect("/dashboard");
-  }
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
-
+      <AdminNav userName={session.name} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -37,7 +20,6 @@ export default async function NewExercisePage() {
           >
             ← Volver a ejercicios
           </Link>
-
           <h1 className="text-3xl font-bold text-white mt-4">
             Nuevo Ejercicio
           </h1>
@@ -45,7 +27,6 @@ export default async function NewExercisePage() {
             Agrega un nuevo ejercicio a la biblioteca
           </p>
         </div>
-
         <NewExerciseForm />
       </main>
     </div>

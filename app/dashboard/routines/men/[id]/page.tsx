@@ -1,52 +1,43 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+// ============================================================
+// ARCHIVO: app/dashboard/routines/men/[id]/page.tsx
+// ============================================================
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/user/UserNav";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
-export default async function RoutineDaysPage({
+export default async function MenRoutineDaysPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role === "admin") redirect("/admin");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") redirect("/admin");
-
-  // Obtener rutina
-  const { data: routine } = await supabase
-    .from("routines")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [profile, routine, days] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { id: session.id },
+      select: { fullName: true },
+    }),
+    prisma.routine.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    }),
+    prisma.routineDay.findMany({
+      where: { routineId: id },
+      orderBy: { dayNumber: "asc" },
+      include: { exercises: { select: { id: true } } },
+    }),
+  ]);
 
   if (!routine) redirect("/dashboard/routines/men");
 
-  // Días de entrenamiento
-  const days = [
-    { day: 1, name: "Día 1", focus: "Pecho y Tríceps" },
-    { day: 2, name: "Día 2", focus: "Espalda y Bíceps" },
-    { day: 3, name: "Día 3", focus: "Piernas" },
-    { day: 4, name: "Día 4", focus: "Hombros y Abdomen" },
-    { day: 5, name: "Día 5", focus: "Full Body" },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-900">
-      <UserNav userName={profile?.full_name || user.email || "Usuario"} />
-
+      <UserNav userName={profile?.fullName || session.name || "Usuario"} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -56,21 +47,53 @@ export default async function RoutineDaysPage({
             ← Volver a rutinas
           </Link>
           <h1 className="text-4xl font-bold text-white mb-2">{routine.name}</h1>
-          <p className="text-gray-400">Selecciona el día de entrenamiento</p>
+          <p className="text-gray-400">
+            {days.length} día{days.length !== 1 ? "s" : ""} de entrenamiento
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {days.map((day) => (
-            <Link
-              key={day.day}
-              href={`/dashboard/routines/men/${id}/day/${day.day}`}
-              className="group aspect-square bg-gray-800 border-2 border-gray-700 hover:border-blue-500 rounded-xl p-6 flex flex-col items-center justify-center transition-all hover:scale-105"
-            >
-              <h3 className="text-2xl font-bold text-white mb-1">{day.name}</h3>
-              <p className="text-gray-400 text-sm text-center">{day.focus}</p>
-            </Link>
-          ))}
-        </div>
+        {days.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {days.map((day) => (
+              <Link
+                key={day.id}
+                href={`/dashboard/routines/men/${id}/day/${day.dayNumber}`}
+                className="group bg-gray-800 border-2 border-gray-700 hover:border-blue-500 rounded-xl p-6 transition-all hover:scale-105"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <span className="text-blue-400 font-bold text-sm">
+                      DÍA {day.dayNumber}
+                    </span>
+                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors mt-1">
+                      {day.dayName}
+                    </h3>
+                  </div>
+                </div>
+                {day.description && (
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                    {day.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                  <span className="text-gray-400 text-sm">
+                    {day.exercises.length} ejercicio
+                    {day.exercises.length !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-blue-400 group-hover:text-blue-300 text-sm">
+                    Ver →
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-400">
+              No hay días configurados para esta rutina
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );

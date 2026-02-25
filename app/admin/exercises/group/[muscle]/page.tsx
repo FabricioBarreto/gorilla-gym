@@ -1,7 +1,8 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
@@ -14,33 +15,15 @@ export default async function AdminMuscleGroupExercisesPage({
   const { muscle } = await params;
   const muscleName = decodeURIComponent(muscle);
 
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") redirect("/dashboard");
-
-  // Obtener ejercicios del grupo muscular
-  const { data: exercises } = await supabase
-    .from("exercises")
-    .select(
-      `
-      *,
-      exercise_images (*)
-    `,
-    )
-    .eq("muscle_group", muscleName)
-    .order("name");
+  const exercises = await prisma.exercise.findMany({
+    where: { muscleGroup: muscleName },
+    include: { images: true },
+    orderBy: { name: "asc" },
+  });
 
   const muscleIcons: Record<string, string> = {
     Pecho: "💪",
@@ -61,8 +44,7 @@ export default async function AdminMuscleGroupExercisesPage({
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
-
+      <AdminNav userName={session.name} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -79,12 +61,11 @@ export default async function AdminMuscleGroupExercisesPage({
               <div>
                 <h1 className="text-4xl font-bold text-white">{muscleName}</h1>
                 <p className="text-gray-400 mt-2">
-                  {exercises?.length || 0} ejercicio
-                  {exercises?.length !== 1 ? "s" : ""} disponibles
+                  {exercises.length} ejercicio
+                  {exercises.length !== 1 ? "s" : ""} disponibles
                 </p>
               </div>
             </div>
-
             <Link
               href="/admin/exercises/new"
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -95,23 +76,20 @@ export default async function AdminMuscleGroupExercisesPage({
           </div>
         </div>
 
-        {/* Grid de ejercicios */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exercises && exercises.length > 0 ? (
+          {exercises.length > 0 ? (
             exercises.map((exercise) => {
-              const firstImage = exercise.exercise_images?.[0];
-
+              const firstImage = exercise.images?.[0];
               return (
                 <Link
                   key={exercise.id}
                   href={`/admin/exercises/${exercise.id}`}
                   className="group bg-gray-800 border-2 border-gray-700 hover:border-green-500 rounded-xl overflow-hidden transition-all hover:scale-105"
                 >
-                  {/* Imagen */}
                   {firstImage ? (
                     <div className="aspect-video bg-gray-700 overflow-hidden">
                       <img
-                        src={firstImage.image_url}
+                        src={firstImage.imageUrl}
                         alt={exercise.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                       />
@@ -121,22 +99,18 @@ export default async function AdminMuscleGroupExercisesPage({
                       <span className="text-6xl opacity-20">🏋️</span>
                     </div>
                   )}
-
-                  {/* Contenido */}
                   <div className="p-5">
                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-green-400 transition-colors">
                       {exercise.name}
                     </h3>
-
                     {exercise.description && (
                       <p className="text-gray-400 text-sm line-clamp-2 mb-3">
                         {exercise.description}
                       </p>
                     )}
-
                     <div className="flex items-center justify-between">
                       <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">
-                        {exercise.muscle_group}
+                        {exercise.muscleGroup}
                       </span>
                       <span className="text-gray-500 group-hover:text-green-400 transition-colors text-sm">
                         Ver detalles →

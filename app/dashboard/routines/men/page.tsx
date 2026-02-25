@@ -1,40 +1,35 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+// ============================================================
+// ARCHIVO: app/dashboard/routines/men/page.tsx
+// ============================================================
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/user/UserNav";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
-// ⬇️ AGREGAR ESTO
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
 export default async function MenRoutinesPage() {
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role === "admin") redirect("/admin");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") redirect("/admin");
-
-  // Obtener rutinas para hombres
-  const { data: routines } = await supabase
-    .from("routines")
-    .select("id, name, description")
-    .eq("category", "hombres")
-    .order("name");
+  const [profile, routines] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { id: session.id },
+      select: { fullName: true },
+    }),
+    prisma.routine.findMany({
+      where: { category: { equals: "Hombres", mode: "insensitive" } },
+      select: { id: true, name: true, description: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <UserNav userName={profile?.full_name || user.email || "Usuario"} />
-
+      <UserNav userName={profile?.fullName || session.name || "Usuario"} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -48,9 +43,8 @@ export default async function MenRoutinesPage() {
           </h1>
           <p className="text-gray-400">Selecciona una rutina para comenzar</p>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {routines && routines.length > 0 ? (
+          {routines.length > 0 ? (
             routines.map((routine) => (
               <Link
                 key={routine.id}

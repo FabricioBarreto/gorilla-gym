@@ -1,5 +1,8 @@
 "use client";
 
+// ============================================================
+// ARCHIVO: components/user/MuscleExercisesList.tsx
+// ============================================================
 import { useState } from "react";
 
 interface Exercise {
@@ -35,26 +38,26 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
     setCurrentImageIndex(0);
   };
 
+  // Imágenes del modal ordenadas por order_index
+  const sortedImages = [...(selectedExercise?.exercise_images || [])].sort(
+    (a, b) => a.order_index - b.order_index,
+  );
+
   const nextImage = () => {
-    if (selectedExercise?.exercise_images) {
-      setCurrentImageIndex((prev) =>
-        prev < selectedExercise.exercise_images!.length - 1 ? prev + 1 : 0,
-      );
-    }
+    setCurrentImageIndex((prev) =>
+      prev < sortedImages.length - 1 ? prev + 1 : 0,
+    );
   };
 
   const prevImage = () => {
-    if (selectedExercise?.exercise_images) {
-      setCurrentImageIndex((prev) =>
-        prev > 0 ? prev - 1 : selectedExercise.exercise_images!.length - 1,
-      );
-    }
+    setCurrentImageIndex((prev) =>
+      prev > 0 ? prev - 1 : sortedImages.length - 1,
+    );
   };
 
   if (exercises.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-6xl mb-4">🏋️</div>
         <p className="text-gray-400 text-lg">
           No hay ejercicios en este grupo muscular
         </p>
@@ -66,7 +69,10 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {exercises.map((exercise) => {
-          const firstImage = exercise.exercise_images?.[0];
+          // Primera imagen también ordenada
+          const firstImage = [...(exercise.exercise_images || [])].sort(
+            (a, b) => a.order_index - b.order_index,
+          )[0];
 
           return (
             <div
@@ -74,7 +80,6 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
               onClick={() => handleExerciseClick(exercise)}
               className="group bg-gray-800 border-2 border-gray-700 hover:border-green-500 rounded-xl overflow-hidden cursor-pointer transition-all hover:scale-105"
             >
-              {/* Imagen */}
               {firstImage ? (
                 <div className="aspect-video bg-gray-700 overflow-hidden">
                   <img
@@ -85,27 +90,24 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
                 </div>
               ) : (
                 <div className="aspect-video bg-gray-700 flex items-center justify-center">
-                  <span className="text-6xl opacity-20">🏋️</span>
+                  <span className="text-gray-600 text-sm">Sin imagen</span>
                 </div>
               )}
 
-              {/* Contenido */}
               <div className="p-5">
                 <h3 className="text-lg font-bold text-white mb-2 group-hover:text-green-400 transition-colors">
                   {exercise.name}
                 </h3>
-
                 {exercise.description && (
                   <p className="text-gray-400 text-sm line-clamp-2 mb-3">
                     {exercise.description}
                   </p>
                 )}
-
                 <div className="flex items-center justify-between">
                   <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">
                     {exercise.muscle_group}
                   </span>
-                  <span className="text-gray-500 group-hover:text-green-400 transition-colors">
+                  <span className="text-gray-500 group-hover:text-green-400 transition-colors text-sm">
                     Ver detalles →
                   </span>
                 </div>
@@ -126,7 +128,6 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
-              {/* Header */}
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-2">
@@ -138,83 +139,73 @@ export function MuscleExercisesList({ exercises }: MuscleExercisesListProps) {
                 </div>
                 <button
                   onClick={closeModal}
-                  className="text-gray-400 hover:text-white text-2xl"
+                  className="text-gray-400 hover:text-white text-2xl leading-none"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* Carousel de imágenes */}
-              {selectedExercise.exercise_images &&
-                selectedExercise.exercise_images.length > 0 && (
-                  <div className="mb-6">
-                    <div className="relative bg-gray-900 rounded-lg overflow-hidden">
-                      <img
-                        src={
-                          selectedExercise.exercise_images[currentImageIndex]
-                            .image_url
-                        }
-                        alt={`${selectedExercise.name} - paso ${currentImageIndex + 1}`}
-                        className="w-full h-96 object-contain"
-                      />
+              {/* Carousel ordenado por order_index */}
+              {sortedImages.length > 0 && (
+                <div className="mb-6">
+                  <div className="relative bg-gray-900 rounded-lg overflow-hidden">
+                    <img
+                      src={sortedImages[currentImageIndex].image_url}
+                      alt={`${selectedExercise.name} - paso ${currentImageIndex + 1}`}
+                      className="w-full h-96 object-contain"
+                    />
 
-                      {selectedExercise.exercise_images.length > 1 && (
-                        <>
-                          <button
-                            onClick={prevImage}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-10 h-10 flex items-center justify-center"
-                          >
-                            ←
-                          </button>
-                          <button
-                            onClick={nextImage}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-10 h-10 flex items-center justify-center"
-                          >
-                            →
-                          </button>
-
-                          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
-                            {selectedExercise.exercise_images.map((_, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => setCurrentImageIndex(idx)}
-                                className={`w-2 h-2 rounded-full ${
-                                  idx === currentImageIndex
-                                    ? "bg-green-500"
-                                    : "bg-gray-500"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    {sortedImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={prevImage}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-10 h-10 flex items-center justify-center"
+                        >
+                          ←
+                        </button>
+                        <button
+                          onClick={nextImage}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full w-10 h-10 flex items-center justify-center"
+                        >
+                          →
+                        </button>
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                          {sortedImages.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setCurrentImageIndex(idx)}
+                              className={`w-2 h-2 rounded-full transition-colors ${
+                                idx === currentImageIndex
+                                  ? "bg-green-500"
+                                  : "bg-gray-500"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-              {/* Descripción */}
               {selectedExercise.description && (
                 <div className="mb-6">
-                  <h3 className="text-white font-bold mb-2">📝 Descripción</h3>
+                  <h3 className="text-white font-bold mb-2">Descripción</h3>
                   <p className="text-gray-300">
                     {selectedExercise.description}
                   </p>
                 </div>
               )}
 
-              {/* Instrucciones */}
               {selectedExercise.instructions && (
                 <div className="mb-6">
-                  <h3 className="text-white font-bold mb-2">
-                    📋 Instrucciones
-                  </h3>
+                  <h3 className="text-white font-bold mb-2">Instrucciones</h3>
                   <p className="text-gray-300 whitespace-pre-line">
                     {selectedExercise.instructions}
                   </p>
                 </div>
               )}
 
-              {/* Footer */}
               <div className="pt-6 border-t border-gray-700">
                 <p className="text-gray-400 text-sm text-center">
                   Consulta con tu entrenador si tienes dudas sobre la técnica

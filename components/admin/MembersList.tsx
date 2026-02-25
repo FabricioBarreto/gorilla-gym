@@ -89,7 +89,7 @@ export function MembersList({ members }: MembersListProps) {
   const searchFiltered = members.filter((member) => {
     const search = searchTerm.toLowerCase();
     return (
-      member.full_name.toLowerCase().includes(search) ||
+      (member.full_name ?? "").toLowerCase().includes(search) ||
       member.dni?.toLowerCase().includes(search)
     );
   });

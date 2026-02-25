@@ -1,54 +1,44 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+// ============================================================
+// ARCHIVO: app/dashboard/routine/page.tsx
+// ============================================================
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/user/UserNav";
 import Link from "next/link";
 import { OfflineRoutinesLoader } from "@/components/user/OfflineRoutinesLoader";
+import prisma from "@/lib/prisma";
 
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
 export default async function UserRoutinePage() {
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role === "admin") redirect("/admin");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await prisma.profile.findUnique({
+    where: { id: session.id },
+    select: { fullName: true },
+  });
 
-  if (!user) redirect("/login");
+  const routines = await prisma.routine.findMany({
+    orderBy: { name: "asc" },
+    include: { days: { include: { exercises: { select: { id: true } } } } },
+  });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") redirect("/admin");
-
-  // Intentar obtener rutinas online
-  let routines = null;
-  try {
-    const { data } = await supabase
-      .from("routines")
-      .select(
-        `
-        *,
-        routine_days (
-          id,
-          routine_exercises (count)
-        )
-      `,
-      )
-      .order("name");
-
-    routines = data;
-  } catch (error) {
-    console.log("Error fetching routines, will use offline data");
-  }
+  const routinesForComponent = routines.map((r) => ({
+    ...r,
+    created_at: r.createdAt.toISOString(),
+    updated_at: r.updatedAt.toISOString(),
+    routine_days: r.days.map((d) => ({
+      id: d.id,
+      routine_exercises: d.exercises.map((e) => ({ id: e.id })),
+    })),
+  }));
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <UserNav userName={profile?.full_name || user.email || "Usuario"} />
-
+      <UserNav userName={profile?.fullName || session.name || "Usuario"} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -61,9 +51,10 @@ export default async function UserRoutinePage() {
             💪 Rutinas Disponibles
           </h1>
         </div>
-
-        {/* Componente que maneja online/offline */}
-        <OfflineRoutinesLoader initialRoutines={routines} userId={user.id} />
+        <OfflineRoutinesLoader
+          initialRoutines={routinesForComponent}
+          userId={session.id}
+        />
       </main>
     </div>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { ExerciseSelector } from "./ExerciseSelector";
 
@@ -10,7 +9,6 @@ interface Exercise {
   name: string;
   muscle_group: string;
 }
-
 interface DayExercise {
   exerciseId: string;
   sets: number;
@@ -19,7 +17,6 @@ interface DayExercise {
   notes: string;
   order_index: number;
 }
-
 interface RoutineDay {
   day_number: number;
   day_name: string;
@@ -32,40 +29,25 @@ interface NewRoutineFormByDaysProps {
   adminId: string;
 }
 
-export function NewRoutineFormByDays({
-  exercises,
-  adminId,
-}: NewRoutineFormByDaysProps) {
+export function NewRoutineFormByDays({ exercises }: NewRoutineFormByDaysProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<"hombres" | "mujeres" | "">("");
-
   const [days, setDays] = useState<RoutineDay[]>([
-    {
-      day_number: 1,
-      day_name: "",
-      description: "",
-      exercises: [],
-    },
+    { day_number: 1, day_name: "", description: "", exercises: [] },
   ]);
-
-  // Estado para controlar qué días están expandidos
   const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>({
     0: true,
   });
 
-  const toggleDay = (dayIndex: number) => {
-    setExpandedDays((prev) => ({ ...prev, [dayIndex]: !prev[dayIndex] }));
-  };
+  const toggleDay = (idx: number) =>
+    setExpandedDays((prev) => ({ ...prev, [idx]: !prev[idx] }));
 
   const addDay = () => {
-    const newDayIndex = days.length;
+    const newIdx = days.length;
     setDays([
       ...days,
       {
@@ -75,24 +57,18 @@ export function NewRoutineFormByDays({
         exercises: [],
       },
     ]);
-    // Expandir el nuevo día automáticamente
-    setExpandedDays((prev) => ({ ...prev, [newDayIndex]: true }));
+    setExpandedDays((prev) => ({ ...prev, [newIdx]: true }));
   };
 
   const removeDay = (dayIndex: number) => {
     const updated = days.filter((_, i) => i !== dayIndex);
     updated.forEach((day, i) => (day.day_number = i + 1));
     setDays(updated);
-
-    // Actualizar expandedDays
     const newExpanded: Record<number, boolean> = {};
     Object.keys(expandedDays).forEach((key) => {
       const idx = parseInt(key);
-      if (idx < dayIndex) {
-        newExpanded[idx] = expandedDays[idx];
-      } else if (idx > dayIndex) {
-        newExpanded[idx - 1] = expandedDays[idx];
-      }
+      if (idx < dayIndex) newExpanded[idx] = expandedDays[idx];
+      else if (idx > dayIndex) newExpanded[idx - 1] = expandedDays[idx];
     });
     setExpandedDays(newExpanded);
   };
@@ -143,72 +119,35 @@ export function NewRoutineFormByDays({
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
       if (!name.trim()) throw new Error("El nombre de la rutina es requerido");
       if (!category) throw new Error("Debes seleccionar una categoría");
       if (days.length === 0) throw new Error("Debes agregar al menos un día");
-
       for (const day of days) {
-        if (!day.day_name.trim()) {
+        if (!day.day_name.trim())
           throw new Error(`El Día ${day.day_number} necesita un nombre`);
-        }
-        if (day.exercises.length === 0) {
+        if (day.exercises.length === 0)
           throw new Error(
             `El Día ${day.day_number} necesita al menos un ejercicio`,
           );
-        }
-        const hasEmptyExercise = day.exercises.some((ex) => !ex.exerciseId);
-        if (hasEmptyExercise) {
+        if (day.exercises.some((ex) => !ex.exerciseId))
           throw new Error(
             `Todos los ejercicios del Día ${day.day_number} deben estar seleccionados`,
           );
-        }
       }
 
-      const { data: routine, error: routineError } = await supabase
-        .from("routines")
-        .insert({
+      const res = await fetch("/api/routines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          category: category,
-          created_by: adminId,
-        })
-        .select()
-        .single();
-
-      if (routineError) throw routineError;
-
-      for (const day of days) {
-        const { data: routineDay, error: dayError } = await supabase
-          .from("routine_days")
-          .insert({
-            routine_id: routine.id,
-            day_number: day.day_number,
-            day_name: day.day_name.trim(),
-            description: day.description.trim() || null,
-          })
-          .select()
-          .single();
-
-        if (dayError) throw dayError;
-
-        const dayExercises = day.exercises.map((ex) => ({
-          routine_day_id: routineDay.id,
-          exercise_id: ex.exerciseId,
-          sets: ex.sets,
-          reps: ex.reps,
-          rest_seconds: ex.rest_seconds,
-          notes: ex.notes || null,
-          order_index: ex.order_index,
-        }));
-
-        const { error: exercisesError } = await supabase
-          .from("routine_exercises")
-          .insert(dayExercises);
-
-        if (exercisesError) throw exercisesError;
-      }
+          category,
+          days,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       router.push("/admin/routines");
       router.refresh();
@@ -227,12 +166,10 @@ export function NewRoutineFormByDays({
         </div>
       )}
 
-      {/* Información Básica */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <h2 className="text-xl font-bold text-white mb-4">
           Información Básica
         </h2>
-
         <div className="space-y-4">
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
@@ -247,7 +184,6 @@ export function NewRoutineFormByDays({
               placeholder="Ej: Gorilla Gym - Semana 2"
             />
           </div>
-
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
               Descripción (opcional)
@@ -260,43 +196,29 @@ export function NewRoutineFormByDays({
               placeholder="Rutina de hipertrofia avanzada..."
             />
           </div>
-
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-3">
               Categoría *
             </label>
             <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setCategory("hombres")}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  category === "hombres"
-                    ? "border-blue-500 bg-blue-500/10"
-                    : "border-gray-600 bg-gray-700/50 hover:border-gray-500"
-                }`}
-              >
-                <div className="text-4xl mb-2">💪</div>
-                <p className="text-white font-medium">Hombres</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCategory("mujeres")}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  category === "mujeres"
-                    ? "border-pink-500 bg-pink-500/10"
-                    : "border-gray-600 bg-gray-700/50 hover:border-gray-500"
-                }`}
-              >
-                <div className="text-4xl mb-2">🏋️‍♀️</div>
-                <p className="text-white font-medium">Mujeres</p>
-              </button>
+              {(["hombres", "mujeres"] as const).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className={`p-4 rounded-lg border-2 transition-all ${category === cat ? (cat === "hombres" ? "border-blue-500 bg-blue-500/10" : "border-pink-500 bg-pink-500/10") : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
+                >
+                  <div className="text-4xl mb-2">
+                    {cat === "hombres" ? "💪" : "🏋️‍♀️"}
+                  </div>
+                  <p className="text-white font-medium capitalize">{cat}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Días */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">
@@ -316,29 +238,22 @@ export function NewRoutineFormByDays({
           const isExpanded = expandedDays[dayIndex] || false;
           const exerciseCount = day.exercises.length;
           const hasName = day.day_name.trim() !== "";
-
           return (
             <div
               key={dayIndex}
               className="bg-gray-800 border-2 border-gray-700 rounded-lg overflow-hidden"
             >
-              {/* Header colapsable */}
-              {/* Header colapsable */}
               <div className="flex items-center justify-between p-5 hover:bg-gray-700/50 transition-colors">
-                {/* Parte clickeable para expandir/colapsar */}
                 <button
                   type="button"
                   onClick={() => toggleDay(dayIndex)}
                   className="flex-1 flex items-center space-x-4"
                 >
-                  {/* Número del día */}
                   <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold text-lg">
                       {day.day_number}
                     </span>
                   </div>
-
-                  {/* Info del día */}
                   <div className="text-left">
                     <div className="flex items-center space-x-2">
                       <h3 className="text-lg font-bold text-white">
@@ -356,23 +271,19 @@ export function NewRoutineFormByDays({
                     </p>
                   </div>
                 </button>
-
-                {/* Acciones (fuera del botón de toggle) */}
                 <div className="flex items-center space-x-3">
                   {days.length > 1 && (
                     <button
                       type="button"
                       onClick={() => {
-                        if (confirm(`¿Eliminar Día ${day.day_number}?`)) {
+                        if (confirm(`¿Eliminar Día ${day.day_number}?`))
                           removeDay(dayIndex);
-                        }
                       }}
                       className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition-colors"
                     >
                       🗑️ Eliminar
                     </button>
                   )}
-
                   <button
                     type="button"
                     onClick={() => toggleDay(dayIndex)}
@@ -387,11 +298,9 @@ export function NewRoutineFormByDays({
                 </div>
               </div>
 
-              {/* Contenido expandible */}
               {isExpanded && (
                 <div className="p-6 pt-0 border-t border-gray-700">
                   <div className="space-y-4">
-                    {/* Nombre del día */}
                     <div>
                       <label className="block text-gray-300 text-sm font-medium mb-2">
                         Nombre del Día *
@@ -407,8 +316,6 @@ export function NewRoutineFormByDays({
                         placeholder="Ej: Cuádriceps y Pantorrillas"
                       />
                     </div>
-
-                    {/* Descripción (opcional) */}
                     <div>
                       <label className="block text-gray-300 text-sm font-medium mb-2">
                         Descripción (opcional)
@@ -423,8 +330,6 @@ export function NewRoutineFormByDays({
                         placeholder="Enfoque en fuerza..."
                       />
                     </div>
-
-                    {/* Ejercicios */}
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <label className="text-gray-300 text-sm font-medium">
@@ -439,7 +344,6 @@ export function NewRoutineFormByDays({
                           <span>Agregar Ejercicio</span>
                         </button>
                       </div>
-
                       <div className="space-y-3">
                         {day.exercises.map((exercise, exerciseIndex) => (
                           <div
@@ -471,88 +375,72 @@ export function NewRoutineFormByDays({
                                 🗑️
                               </button>
                             </div>
-
                             <div className="grid grid-cols-1 gap-3">
-                              {/* Selector de ejercicio */}
-                              <div>
-                                <ExerciseSelector
-                                  exercises={exercises}
-                                  selectedExerciseId={exercise.exerciseId}
-                                  onSelect={(exerciseId) =>
-                                    updateDayExercise(
-                                      dayIndex,
-                                      exerciseIndex,
-                                      "exerciseId",
-                                      exerciseId,
-                                    )
-                                  }
-                                />
-                              </div>
-
-                              {/* Series, Reps, Descanso */}
+                              <ExerciseSelector
+                                exercises={exercises}
+                                selectedExerciseId={exercise.exerciseId}
+                                onSelect={(exerciseId) =>
+                                  updateDayExercise(
+                                    dayIndex,
+                                    exerciseIndex,
+                                    "exerciseId",
+                                    exerciseId,
+                                  )
+                                }
+                              />
                               <div className="grid grid-cols-3 gap-2">
-                                <div>
-                                  <label className="block text-gray-400 text-xs mb-1">
-                                    Series
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={exercise.sets}
-                                    onChange={(e) =>
-                                      updateDayExercise(
-                                        dayIndex,
-                                        exerciseIndex,
-                                        "sets",
-                                        parseInt(e.target.value) || 1,
-                                      )
-                                    }
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-gray-400 text-xs mb-1">
-                                    Reps
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={exercise.reps}
-                                    onChange={(e) =>
-                                      updateDayExercise(
-                                        dayIndex,
-                                        exerciseIndex,
-                                        "reps",
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="10"
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-gray-400 text-xs mb-1">
-                                    Desc(s)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={exercise.rest_seconds}
-                                    onChange={(e) =>
-                                      updateDayExercise(
-                                        dayIndex,
-                                        exerciseIndex,
-                                        "rest_seconds",
-                                        parseInt(e.target.value) || 0,
-                                      )
-                                    }
-                                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  />
-                                </div>
+                                {[
+                                  {
+                                    label: "Series",
+                                    field: "sets" as const,
+                                    type: "number",
+                                    min: 1,
+                                  },
+                                  {
+                                    label: "Reps",
+                                    field: "reps" as const,
+                                    type: "text",
+                                    placeholder: "10",
+                                  },
+                                  {
+                                    label: "Desc(s)",
+                                    field: "rest_seconds" as const,
+                                    type: "number",
+                                    min: 0,
+                                  },
+                                ].map(
+                                  ({
+                                    label,
+                                    field,
+                                    type,
+                                    min,
+                                    placeholder,
+                                  }) => (
+                                    <div key={field}>
+                                      <label className="block text-gray-400 text-xs mb-1">
+                                        {label}
+                                      </label>
+                                      <input
+                                        type={type}
+                                        min={min}
+                                        value={exercise[field]}
+                                        placeholder={placeholder}
+                                        onChange={(e) =>
+                                          updateDayExercise(
+                                            dayIndex,
+                                            exerciseIndex,
+                                            field,
+                                            type === "number"
+                                              ? parseInt(e.target.value) || 0
+                                              : e.target.value,
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                      />
+                                    </div>
+                                  ),
+                                )}
                               </div>
-
-                              {/* Notas */}
                               <div>
                                 <label className="block text-gray-400 text-xs mb-1">
                                   Notas
@@ -560,6 +448,7 @@ export function NewRoutineFormByDays({
                                 <input
                                   type="text"
                                   value={exercise.notes}
+                                  placeholder="Fuerza (alta carga)"
                                   onChange={(e) =>
                                     updateDayExercise(
                                       dayIndex,
@@ -568,14 +457,12 @@ export function NewRoutineFormByDays({
                                       e.target.value,
                                     )
                                   }
-                                  placeholder="Fuerza (alta carga)"
                                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                                 />
                               </div>
                             </div>
                           </div>
                         ))}
-
                         {day.exercises.length === 0 && (
                           <div className="text-center py-8 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
                             <p className="text-gray-400 text-sm mb-3">
@@ -600,7 +487,6 @@ export function NewRoutineFormByDays({
         })}
       </div>
 
-      {/* Botones */}
       <div className="flex justify-end space-x-4">
         <button
           type="button"

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,11 +12,10 @@ interface AdminNavProps {
 export function AdminNav({ userName }: AdminNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   };
@@ -27,8 +25,7 @@ export function AdminNav({ userName }: AdminNavProps) {
     { href: "/admin/members", label: "Alumnos", icon: "👥" },
     { href: "/admin/exercises", label: "Ejercicios", icon: "🏋️" },
     { href: "/admin/routines", label: "Rutinas", icon: "📋" },
-    { href: "/admin/administrators", label: "Administradores", icon: "🧑" },
-
+    { href: "/admin/admins", label: "Admins", icon: "👑" },
     { href: "/admin/settings", label: "Configuración", icon: "⚙️" },
   ];
 
@@ -36,13 +33,11 @@ export function AdminNav({ userName }: AdminNavProps) {
     <nav className="bg-gray-800 border-b border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link href="/admin" className="flex items-center space-x-2">
             <span className="text-3xl">🦍</span>
             <span className="text-white font-bold text-xl">Gorilla GYM</span>
           </Link>
 
-          {/* Links desktop */}
           <div className="hidden md:flex items-baseline space-x-2">
             {navItems.map((item) => (
               <Link
@@ -60,7 +55,6 @@ export function AdminNav({ userName }: AdminNavProps) {
             ))}
           </div>
 
-          {/* Desktop: usuario + salir */}
           <div className="hidden md:flex items-center space-x-4">
             <span className="text-gray-300 text-sm">👤 {userName}</span>
             <button
@@ -71,7 +65,6 @@ export function AdminNav({ userName }: AdminNavProps) {
             </button>
           </div>
 
-          {/* Mobile: botón hamburguesa */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden text-gray-300 hover:text-white p-2 rounded-md focus:outline-none"
@@ -110,7 +103,6 @@ export function AdminNav({ userName }: AdminNavProps) {
         </div>
       </div>
 
-      {/* Mobile menu desplegable */}
       {menuOpen && (
         <div className="md:hidden border-t border-gray-700">
           <div className="px-2 pt-2 pb-3 space-y-1">

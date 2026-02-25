@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 
@@ -14,18 +13,11 @@ interface Member {
   created_at: string;
 }
 
-interface MemberDetailHeaderProps {
-  member: Member;
-}
-
-export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
+export function MemberDetailHeader({ member }: { member: Member }) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
     full_name: member.full_name,
     dni: member.dni || "",
@@ -35,19 +27,14 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
   const handleSave = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: formData.full_name,
-          dni: formData.dni,
-          phone: formData.phone,
-        })
-        .eq("id", member.id);
-
-      if (updateError) throw updateError;
-
+      const res = await fetch(`/api/members/${member.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setIsEditing(false);
       router.refresh();
     } catch (err: any) {
@@ -74,7 +61,7 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center">
               <span className="text-white text-2xl font-bold">
-                {member.full_name.charAt(0).toUpperCase()}
+                {(member.full_name ?? "?").charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
@@ -87,17 +74,14 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
               </p>
             </div>
           </div>
-
-          <div className="flex items-center space-x-3">
-            {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
-              >
-                ✏️ Editar
-              </button>
-            )}
-          </div>
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
+              ✏️ Editar
+            </button>
+          )}
         </div>
 
         {error && (
@@ -122,7 +106,6 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   DNI
@@ -141,7 +124,6 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Teléfono
@@ -156,7 +138,6 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
                 />
               </div>
             </div>
-
             <div className="flex justify-end space-x-3">
               <button
                 onClick={handleCancel}
@@ -182,14 +163,12 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
                 {member.dni || "No especificado"}
               </p>
             </div>
-
             <div>
               <p className="text-gray-400 text-sm">Teléfono</p>
               <p className="text-white font-medium">
                 {member.phone || "No especificado"}
               </p>
             </div>
-
             <div>
               <p className="text-gray-400 text-sm">ID de Usuario</p>
               <p className="text-white font-medium text-xs">
@@ -200,7 +179,6 @@ export function MemberDetailHeader({ member }: MemberDetailHeaderProps) {
         )}
       </div>
 
-      {/* Botón de Resetear Contraseña - SIEMPRE VISIBLE */}
       <div className="mt-6">
         <ResetPasswordButton
           userId={member.id}

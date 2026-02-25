@@ -1,39 +1,32 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+// ============================================================
+// ARCHIVO: app/admin/routines/new/page.tsx
+// ============================================================
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { NewRoutineFormByDays } from "@/components/admin/NewRoutineFormByDays";
+import prisma from "@/lib/prisma";
 
 export default async function NewRoutinePage() {
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const exercises = await prisma.exercise.findMany({
+    select: { id: true, name: true, muscleGroup: true },
+    orderBy: { name: "asc" },
+  });
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    redirect("/dashboard");
-  }
-
-  // Obtener todos los ejercicios
-  const { data: exercises } = await supabase
-    .from("exercises")
-    .select("id, name, muscle_group")
-    .order("name");
+  // Adaptar al formato que espera el componente (snake_case)
+  const exercisesForComponent = exercises.map((e) => ({
+    id: e.id,
+    name: e.name,
+    muscle_group: e.muscleGroup,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
-
+      <AdminNav userName={session.name} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white">➕ Nueva Rutina</h1>
@@ -41,8 +34,10 @@ export default async function NewRoutinePage() {
             Crea una rutina organizada por días
           </p>
         </div>
-
-        <NewRoutineFormByDays exercises={exercises || []} adminId={user.id} />
+        <NewRoutineFormByDays
+          exercises={exercisesForComponent}
+          adminId={session.id}
+        />
       </main>
     </div>
   );

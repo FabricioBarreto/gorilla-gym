@@ -1,16 +1,14 @@
 "use client";
-
+// ============================================================
+// ARCHIVO: components/admin/NewAdminForm.tsx
+// ============================================================
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export function NewAdminForm() {
   const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [dni, setDni] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -20,67 +18,24 @@ export function NewAdminForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      // Validaciones
-      if (!dni.trim() || dni.length < 7 || dni.length > 8) {
+      if (!dni.trim() || dni.length < 7 || dni.length > 8)
         throw new Error("El DNI debe tener 7 u 8 dígitos");
-      }
-
-      if (!fullName.trim()) {
-        throw new Error("El nombre completo es requerido");
-      }
-
-      if (password.length < 6) {
+      if (!fullName.trim()) throw new Error("El nombre completo es requerido");
+      if (password.length < 6)
         throw new Error("La contraseña debe tener al menos 6 caracteres");
-      }
-
-      if (password !== confirmPassword) {
+      if (password !== confirmPassword)
         throw new Error("Las contraseñas no coinciden");
-      }
 
-      // Verificar que el DNI no exista
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("dni")
-        .eq("dni", dni)
-        .single();
-
-      if (existingProfile) {
-        throw new Error("Ya existe un usuario con este DNI");
-      }
-
-      // Crear usuario en auth.users usando admin API
-      const email = `${dni}@gorilagym.local`;
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            dni: dni,
-          },
-        },
+      const res = await fetch("/api/admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: fullName, dni, password }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error("Error al crear el usuario");
-      }
-
-      // Crear perfil de admin
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: authData.user.id,
-        dni: dni,
-        full_name: fullName,
-        role: "admin",
-      });
-
-      if (profileError) throw profileError;
-
-      router.push("/admin/administrators");
+      router.push("/admin/admins");
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -96,9 +51,7 @@ export function NewAdminForm() {
           <p className="text-red-400">{error}</p>
         </div>
       )}
-
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 space-y-4">
-        {/* DNI */}
         <div>
           <label className="block text-gray-300 text-sm font-medium mb-2">
             DNI *
@@ -114,8 +67,6 @@ export function NewAdminForm() {
           />
           <p className="text-gray-400 text-xs mt-1">Sin puntos ni espacios</p>
         </div>
-
-        {/* Nombre Completo */}
         <div>
           <label className="block text-gray-300 text-sm font-medium mb-2">
             Nombre Completo *
@@ -129,8 +80,6 @@ export function NewAdminForm() {
             placeholder="Juan Pérez"
           />
         </div>
-
-        {/* Contraseña */}
         <div>
           <label className="block text-gray-300 text-sm font-medium mb-2">
             Contraseña *
@@ -144,10 +93,7 @@ export function NewAdminForm() {
             className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="••••••••"
           />
-          <p className="text-gray-400 text-xs mt-1">Mínimo 6 caracteres</p>
         </div>
-
-        {/* Confirmar Contraseña */}
         <div>
           <label className="block text-gray-300 text-sm font-medium mb-2">
             Confirmar Contraseña *
@@ -162,8 +108,6 @@ export function NewAdminForm() {
           />
         </div>
       </div>
-
-      {/* Botones */}
       <div className="flex justify-end space-x-4">
         <button
           type="button"

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 interface DeleteRoutineButtonProps {
@@ -14,8 +13,6 @@ export function DeleteRoutineButton({
   routineName,
 }: DeleteRoutineButtonProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,42 +20,16 @@ export function DeleteRoutineButton({
   const handleDelete = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      // Verificar si la rutina está asignada a algún usuario
-      const { data: assignments } = await supabase
-        .from("routine_assignments")
-        .select("id")
-        .eq("routine_id", routineId)
-        .limit(1);
-
-      if (assignments && assignments.length > 0) {
-        throw new Error(
-          "Esta rutina está asignada a uno o más usuarios. Primero debes desasignarla.",
-        );
-      }
-
-      // Eliminar ejercicios de la rutina (CASCADE debería hacerlo automático)
-      const { error: exercisesError } = await supabase
-        .from("routine_exercises")
-        .delete()
-        .eq("routine_id", routineId);
-
-      if (exercisesError) throw exercisesError;
-
-      // Eliminar rutina
-      const { error: routineError } = await supabase
-        .from("routines")
-        .delete()
-        .eq("id", routineId);
-
-      if (routineError) throw routineError;
-
+      const res = await fetch(`/api/routines/${routineId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       router.push("/admin/routines");
       router.refresh();
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -85,7 +56,6 @@ export function DeleteRoutineButton({
             Eliminar Rutina
           </button>
         </div>
-
         {error && (
           <div className="mt-4 bg-red-500/20 border border-red-500/30 rounded-lg p-3">
             <p className="text-red-300 text-sm">{error}</p>
@@ -93,7 +63,6 @@ export function DeleteRoutineButton({
         )}
       </div>
 
-      {/* Modal de confirmación */}
       {showConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-md w-full p-6">
@@ -105,7 +74,6 @@ export function DeleteRoutineButton({
               <strong>"{routineName}"</strong>? Esta acción no se puede
               deshacer.
             </p>
-
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowConfirm(false)}

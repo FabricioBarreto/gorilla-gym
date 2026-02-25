@@ -1,52 +1,53 @@
-import { createAdminSupabaseClient } from "@/lib/supabase-server";
+// ============================================================
+// ARCHIVO: app/admin/routines/[id]/assign/page.tsx
+// ============================================================
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import Link from "next/link";
 import { AssignMembersForm } from "@/components/admin/AssignMembersForm";
+import prisma from "@/lib/prisma";
 
-interface PageProps {
+export default async function AssignRoutinePage({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default async function AssignRoutinePage({ params }: PageProps) {
+}) {
   const { id } = await params;
-  const supabase = await createAdminSupabaseClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") redirect("/dashboard");
-
-  const { data: routine } = await supabase
-    .from("routines")
-    .select("id, name")
-    .eq("id", id)
-    .single();
+  const [routine, members, currentAssignments] = await Promise.all([
+    prisma.routine.findUnique({
+      where: { id },
+      select: { id: true, name: true },
+    }),
+    prisma.profile.findMany({
+      where: { role: "member" },
+      select: { id: true, fullName: true, dni: true },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.routineAssignment.findMany({
+      where: { routineId: id },
+      select: { userId: true },
+    }),
+  ]);
 
   if (!routine) redirect("/admin/routines");
 
-  const { data: members } = await supabase
-    .from("profiles")
-    .select("id, full_name, dni")
-    .eq("role", "member")
-    .order("full_name");
+  const assignedUserIds = currentAssignments.map((a) => a.userId);
 
-  const { data: currentAssignments } = await supabase
-    .from("routine_assignments")
-    .select("user_id")
-    .eq("routine_id", id);
-
-  const assignedUserIds = currentAssignments?.map((a) => a.user_id) || [];
+  const membersForComponent = members.map((m) => ({
+    id: m.id,
+    full_name: m.fullName,
+    dni: m.dni,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
+      <AdminNav userName={session.name} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -62,13 +63,12 @@ export default async function AssignRoutinePage({ params }: PageProps) {
             Seleccioná los alumnos a los que querés asignar esta rutina
           </p>
         </div>
-
         <AssignMembersForm
           routineId={id}
           routineName={routine.name}
-          members={members || []}
+          members={membersForComponent}
           assignedUserIds={assignedUserIds}
-          adminId={user.id}
+          adminId={session.id}
         />
       </main>
     </div>

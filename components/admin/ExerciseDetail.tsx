@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 interface ExerciseImage {
@@ -10,7 +9,6 @@ interface ExerciseImage {
   image_url: string;
   order_index: number;
 }
-
 interface Exercise {
   id: string;
   name: string;
@@ -21,14 +19,8 @@ interface Exercise {
   exercise_images?: ExerciseImage[];
 }
 
-interface ExerciseDetailProps {
-  exercise: Exercise;
-}
-
-export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
+export function ExerciseDetail({ exercise }: { exercise: Exercise }) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,116 +28,94 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
   const [reordering, setReordering] = useState(false);
-
   const [formData, setFormData] = useState({
     name: exercise.name,
     muscle_group: exercise.muscle_group,
     description: exercise.description || "",
     instructions: exercise.instructions || "",
   });
-
   const [newImages, setNewImages] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [tempImageOrder, setTempImageOrder] = useState<ExerciseImage[]>([]);
 
   const muscleGroups = [
     "Pecho",
     "Espalda",
-    "Piernas",
     "Hombros",
+    "Bíceps",
+    "Tríceps",
     "Brazos",
-    "Abdomen",
+    "Cuádriceps",
+    "Isquiotibiales",
     "Glúteos",
-    "Cardio",
+    "Abdomen",
+    "Piernas",
+    "Pantorrillas",
+    "Core",
   ];
-
-  const [tempImageOrder, setTempImageOrder] = useState<ExerciseImage[]>([]);
-
   const sortedImages =
     exercise.exercise_images?.sort((a, b) => a.order_index - b.order_index) ||
     [];
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-
     if (files.length === 0) return;
-
     if (files.length > 5) {
       setError("Máximo 5 imágenes a la vez");
       return;
     }
-
     setNewImages(files);
-
-    // Crear previews
     const previews: string[] = [];
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         previews.push(reader.result as string);
-        if (previews.length === files.length) {
-          setNewImagePreviews(previews);
-        }
+        if (previews.length === files.length) setNewImagePreviews(previews);
       };
       reader.readAsDataURL(file);
     });
   };
 
-  const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `exercises/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("exercise-images")
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from("exercise-images")
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
-  };
-
   const handleAddImages = async () => {
     if (newImages.length === 0) return;
-
     setUploadingImages(true);
     setError(null);
-
     try {
-      // Obtener el último order_index actual
-      const lastOrderIndex =
-        sortedImages.length > 0
-          ? Math.max(...sortedImages.map((img) => img.order_index))
-          : -1;
+      // 1. Subir imágenes
+      const base64Images = await Promise.all(newImages.map(fileToBase64));
+      const uploadRes = await fetch("/api/upload/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          images: base64Images,
+          bucket: "exercise-images",
+        }),
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok)
+        throw new Error(uploadData.error || "Error al subir imágenes");
 
-      // Subir todas las imágenes
-      const uploadPromises = newImages.map((file) => uploadImage(file));
-      const imageUrls = await Promise.all(uploadPromises);
+      // 2. Guardar URLs en DB
+      const res = await fetch(`/api/exercises/${exercise.id}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_urls: uploadData.urls }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-      // Guardar las URLs en exercise_images
-      const imageRecords = imageUrls.map((url, index) => ({
-        exercise_id: exercise.id,
-        image_url: url,
-        order_index: lastOrderIndex + index + 1,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("exercise_images")
-        .insert(imageRecords);
-
-      if (insertError) throw insertError;
-
-      // Limpiar estado
       setNewImages([]);
       setNewImagePreviews([]);
-
-      // Refrescar
       router.refresh();
     } catch (err: any) {
-      console.error("Error:", err);
       setError(err.message || "Error al agregar imágenes");
     } finally {
       setUploadingImages(false);
@@ -159,31 +129,29 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
 
   const moveImage = (fromIndex: number, direction: "up" | "down") => {
     const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
-
     if (toIndex < 0 || toIndex >= tempImageOrder.length) return;
-
     const newOrder = [...tempImageOrder];
     const [movedItem] = newOrder.splice(fromIndex, 1);
     newOrder.splice(toIndex, 0, movedItem);
-
     setTempImageOrder(newOrder);
   };
 
   const saveNewOrder = async () => {
     setReordering(true);
     setError(null);
-
     try {
-      // Actualizar order_index de cada imagen
-      const updates = tempImageOrder.map((img, index) =>
-        supabase
-          .from("exercise_images")
-          .update({ order_index: index })
-          .eq("id", img.id),
-      );
-
-      await Promise.all(updates);
-
+      const res = await fetch(`/api/exercises/${exercise.id}/images`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order: tempImageOrder.map((img, index) => ({
+            id: img.id,
+            orderIndex: index,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setReorderMode(false);
       router.refresh();
     } catch (err: any) {
@@ -193,34 +161,40 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
     }
   };
 
-  const cancelReordering = () => {
-    setReorderMode(false);
-    setTempImageOrder([]);
-  };
-
   const handleSave = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      const { error: updateError } = await supabase
-        .from("exercises")
-        .update({
-          name: formData.name,
-          muscle_group: formData.muscle_group,
-          description: formData.description || null,
-          instructions: formData.instructions || null,
-        })
-        .eq("id", exercise.id);
-
-      if (updateError) throw updateError;
-
+      const res = await fetch(`/api/exercises/${exercise.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setIsEditing(false);
       router.refresh();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm("¿Estás seguro de eliminar esta imagen?")) return;
+    try {
+      const res = await fetch(
+        `/api/exercises/${exercise.id}/images/${imageId}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (currentImageIndex >= sortedImages.length - 1 && currentImageIndex > 0)
+        setCurrentImageIndex(0);
+      router.refresh();
+    } catch (err: any) {
+      alert("Error al eliminar la imagen: " + err.message);
     }
   };
 
@@ -235,40 +209,12 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
     setError(null);
   };
 
-  const handleDeleteImage = async (imageId: string) => {
-    if (!confirm("¿Estás seguro de eliminar esta imagen?")) return;
-
-    try {
-      const { error: deleteError } = await supabase
-        .from("exercise_images")
-        .delete()
-        .eq("id", imageId);
-
-      if (deleteError) throw deleteError;
-
-      // Si eliminamos la imagen actual, volver al índice 0
-      if (
-        currentImageIndex >= sortedImages.length - 1 &&
-        currentImageIndex > 0
-      ) {
-        setCurrentImageIndex(0);
-      }
-
-      router.refresh();
-    } catch (err: any) {
-      alert("Error al eliminar la imagen: " + err.message);
-    }
-  };
-
-  const nextImage = () => {
+  const nextImage = () =>
     setCurrentImageIndex((prev) => (prev + 1) % sortedImages.length);
-  };
-
-  const prevImage = () => {
+  const prevImage = () =>
     setCurrentImageIndex(
       (prev) => (prev - 1 + sortedImages.length) % sortedImages.length,
     );
-  };
 
   return (
     <div className="space-y-6">
@@ -278,7 +224,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
         </div>
       )}
 
-      {/* Encabezado */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -292,7 +237,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
               </p>
             )}
           </div>
-
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
@@ -319,7 +263,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Grupo Muscular
@@ -338,7 +281,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                   ))}
                 </select>
               </div>
-
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Descripción Breve
@@ -352,7 +294,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Instrucciones
@@ -367,7 +308,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                 />
               </div>
             </div>
-
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
               <button
                 onClick={handleCancel}
@@ -386,24 +326,20 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {exercise.description && (
-              <div>
-                <p className="text-gray-400 text-sm mb-1">Descripción</p>
-                <p className="text-white">{exercise.description}</p>
-              </div>
-            )}
-          </div>
+          exercise.description && (
+            <div>
+              <p className="text-gray-400 text-sm mb-1">Descripción</p>
+              <p className="text-white">{exercise.description}</p>
+            </div>
+          )
         )}
       </div>
 
-      {/* Imágenes */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">
             🖼️ Imágenes ({sortedImages.length})
           </h2>
-
           {sortedImages.length > 1 && !reorderMode && (
             <button
               onClick={startReordering}
@@ -414,7 +350,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
           )}
         </div>
 
-        {/* Modo reordenamiento */}
         {reorderMode ? (
           <div className="space-y-4">
             <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
@@ -422,37 +357,31 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                 ℹ️ Usa las flechas ↑↓ para cambiar el orden de las imágenes
               </p>
             </div>
-
             <div className="space-y-3">
               {tempImageOrder.map((img, index) => (
                 <div
                   key={img.id}
                   className="bg-gray-700/50 rounded-lg p-4 flex items-center gap-4"
                 >
-                  {/* Controles de orden */}
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => moveImage(index, "up")}
                       disabled={index === 0}
-                      className="text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-gray-400 hover:text-white disabled:opacity-30"
                     >
                       ↑
                     </button>
                     <button
                       onClick={() => moveImage(index, "down")}
                       disabled={index === tempImageOrder.length - 1}
-                      className="text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="text-gray-400 hover:text-white disabled:opacity-30"
                     >
                       ↓
                     </button>
                   </div>
-
-                  {/* Número */}
                   <div className="flex-shrink-0 w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold">{index + 1}</span>
                   </div>
-
-                  {/* Miniatura */}
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden">
                     <Image
                       src={img.image_url}
@@ -461,8 +390,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                       className="object-cover"
                     />
                   </div>
-
-                  {/* Info */}
                   <div className="flex-1">
                     <p className="text-white font-medium">Paso {index + 1}</p>
                     <p className="text-gray-400 text-sm">
@@ -473,20 +400,18 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                 </div>
               ))}
             </div>
-
-            {/* Botones de confirmación */}
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
               <button
-                onClick={cancelReordering}
+                onClick={() => setReorderMode(false)}
                 disabled={reordering}
-                className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={saveNewOrder}
                 disabled={reordering}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50"
               >
                 {reordering ? "Guardando..." : "Guardar Nuevo Orden"}
               </button>
@@ -494,7 +419,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
           </div>
         ) : (
           <>
-            {/* Carrusel de imágenes existentes */}
             {sortedImages.length > 0 && (
               <div className="mb-6">
                 <div className="relative mb-4">
@@ -505,8 +429,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                       fill
                       className="object-contain"
                     />
-
-                    {/* Controles del carrusel */}
                     {sortedImages.length > 1 && (
                       <>
                         <button
@@ -521,14 +443,11 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                         >
                           →
                         </button>
-
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
                           {currentImageIndex + 1} de {sortedImages.length}
                         </div>
                       </>
                     )}
-
-                    {/* Botón eliminar imagen */}
                     <button
                       onClick={() =>
                         handleDeleteImage(sortedImages[currentImageIndex].id)
@@ -539,19 +458,13 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                     </button>
                   </div>
                 </div>
-
-                {/* Miniaturas */}
                 {sortedImages.length > 1 && (
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {sortedImages.map((img, idx) => (
                       <button
                         key={img.id}
                         onClick={() => setCurrentImageIndex(idx)}
-                        className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                          idx === currentImageIndex
-                            ? "border-green-500 scale-110"
-                            : "border-gray-600 hover:border-gray-500"
-                        }`}
+                        className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${idx === currentImageIndex ? "border-green-500 scale-110" : "border-gray-600 hover:border-gray-500"}`}
                       >
                         <Image
                           src={img.image_url}
@@ -569,12 +482,10 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
               </div>
             )}
 
-            {/* Agregar nuevas imágenes */}
             <div className="border-t border-gray-700 pt-6">
               <h3 className="text-white font-semibold mb-4">
                 ➕ Agregar Nuevas Imágenes
               </h3>
-
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -592,7 +503,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                     lista.
                   </p>
                 </div>
-
                 {newImagePreviews.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-300 mb-3">
@@ -602,7 +512,7 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                       {newImagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group">
+                        <div key={index} className="relative">
                           <div className="relative w-full h-32 bg-gray-700 rounded-lg overflow-hidden">
                             <Image
                               src={preview}
@@ -617,7 +527,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                         </div>
                       ))}
                     </div>
-
                     <div className="flex justify-end space-x-3">
                       <button
                         onClick={() => {
@@ -625,14 +534,14 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
                           setNewImagePreviews([]);
                         }}
                         disabled={uploadingImages}
-                        className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                        className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={handleAddImages}
                         disabled={uploadingImages}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
                       >
                         {uploadingImages ? "Subiendo..." : "Agregar Imágenes"}
                       </button>
@@ -645,7 +554,6 @@ export function ExerciseDetail({ exercise }: ExerciseDetailProps) {
         )}
       </div>
 
-      {/* Instrucciones */}
       {!isEditing && exercise.instructions && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-xl font-bold text-white mb-4">

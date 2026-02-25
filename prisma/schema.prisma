@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  admin
+  member
+}
+
+enum MembershipStatus {
+  active
+  expired
+  cancelled
+}
+
+model Profile {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dni             String   @unique
+  password        String   // Hash de bcrypt
+  role            UserRole @default(member)
+  fullName        String   @map("full_name")
+  phone           String?
+  avatarUrl       String?  @map("avatar_url")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships         Membership[]
+  createdRoutines     Routine[]           @relation("CreatedRoutines")
+  assignedRoutines    Routine[]           @relation("AssignedRoutines")
+  routineAssignments  RoutineAssignment[]
+  assignedBy          RoutineAssignment[] @relation("AssignedBy")
+  updatedPrices       MembershipPrice[]
+
+  @@map("profiles")
+}
+
+model Exercise {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?
+  muscleGroup  String   @map("muscle_group")
+  imageUrl     String?  @map("image_url")
+  videoUrl     String?  @map("video_url")
+  instructions String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  images           ExerciseImage[]
+  routineExercises RoutineExercise[]
+
+  @@map("exercises")
+}
+
+model ExerciseImage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exerciseId String   @map("exercise_id") @db.Uuid
+  imageUrl   String   @map("image_url")
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("exercise_images")
+}
+
+model MembershipPrice {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planType  String   @unique @map("plan_type")
+  price     Int
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  updater Profile? @relation(fields: [updatedBy], references: [id])
+
+  @@map("membership_prices")
+}
+
+model Membership {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  startDate     DateTime         @map("start_date") @db.Date
+  endDate       DateTime         @map("end_date") @db.Date
+  status        MembershipStatus @default(active)
+  planType      String           @map("plan_type")
+  paymentMethod String?          @map("payment_method")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("memberships")
+}
+
+model Routine {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  name        String
+  description String?
+  category    String?
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        Profile?            @relation("AssignedRoutines", fields: [userId], references: [id], onDelete: SetNull)
+  creator     Profile?            @relation("CreatedRoutines", fields: [createdBy], references: [id])
+  days        RoutineDay[]
+  assignments RoutineAssignment[]
+
+  @@map("routines")
+}
+
+model RoutineDay {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  routineId   String?  @map("routine_id") @db.Uuid
+  dayNumber   Int      @map("day_number")
+  dayName     String   @map("day_name")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  routine   Routine?          @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exercises RoutineExercise[]
+
+  @@map("routine_days")
+}
+
+model RoutineExercise {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  routineDayId String   @map("routine_day_id") @db.Uuid
+  exerciseId   String   @map("exercise_id") @db.Uuid
+  sets         Int      @default(3)
+  reps         String   @default("10")
+  restSeconds  Int      @default(60) @map("rest_seconds")
+  notes        String?
+  orderIndex   Int      @default(1) @map("order_index")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  routineDay RoutineDay @relation(fields: [routineDayId], references: [id], onDelete: Cascade)
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("routine_exercises")
+}
+
+model RoutineAssignment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  routineId  String   @map("routine_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  assignedBy String?  @map("assigned_by") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  routine  Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  user     Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assigner Profile? @relation("AssignedBy", fields: [assignedBy], references: [id])
+
+  @@unique([routineId, userId])
+  @@map("routine_assignments")
+}

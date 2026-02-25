@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 interface Routine {
@@ -21,8 +20,6 @@ export function AssignRoutineButton({
   availableRoutines,
 }: AssignRoutineButtonProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [showModal, setShowModal] = useState(false);
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -33,28 +30,19 @@ export function AssignRoutineButton({
       setError("Selecciona una rutina");
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
-      // Obtener admin ID
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autorizado");
-
-      // Crear asignación
-      const { error: assignError } = await supabase
-        .from("routine_assignments")
-        .insert({
-          routine_id: selectedRoutineId,
-          user_id: memberId,
-          assigned_by: user.id,
-        });
-
-      if (assignError) throw assignError;
-
+      const res = await fetch("/api/routine-assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          routineId: selectedRoutineId,
+          userId: memberId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setShowModal(false);
       router.refresh();
     } catch (err: any) {
@@ -66,19 +54,19 @@ export function AssignRoutineButton({
 
   const handleUnassign = async () => {
     if (!currentRoutine) return;
-
     setLoading(true);
     setError(null);
-
     try {
-      const { error: deleteError } = await supabase
-        .from("routine_assignments")
-        .delete()
-        .eq("user_id", memberId)
-        .eq("routine_id", currentRoutine.id);
-
-      if (deleteError) throw deleteError;
-
+      const res = await fetch("/api/routine-assignments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          routineId: currentRoutine.id,
+          userId: memberId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       router.refresh();
     } catch (err: any) {
       setError(err.message);
@@ -114,7 +102,6 @@ export function AssignRoutineButton({
                 {currentRoutine.name}
               </p>
             </div>
-
             <button
               onClick={handleUnassign}
               disabled={loading}
@@ -139,7 +126,6 @@ export function AssignRoutineButton({
         )}
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">

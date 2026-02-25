@@ -1,54 +1,42 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/user/UserNav";
 import { MembershipStatus } from "@/components/user/MembershipStatus";
 import { MembershipHistory } from "@/components/user/MembershipHistory";
 import { ChangePasswordButton } from "@/components/user/ChangePasswordButton";
+import prisma from "@/lib/prisma";
 
 export default async function UserProfilePage() {
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role === "admin") redirect("/admin");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [profile, membership, allMemberships] = await Promise.all([
+    prisma.profile.findUnique({ where: { id: session.id } }),
+    prisma.membership.findFirst({
+      where: { userId: session.id, status: "active" },
+      orderBy: { endDate: "desc" },
+    }),
+    prisma.membership.findMany({
+      where: { userId: session.id },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") {
-    redirect("/admin");
-  }
-
-  // Obtener membresía ACTIVA
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("end_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // Obtener TODAS las membresías (historial)
-  const { data: allMemberships } = await supabase
-    .from("memberships")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const allMembershipsForComponent = allMemberships.map((m) => ({
+    ...m,
+    plan_type: m.planType,
+    start_date: m.startDate.toISOString(),
+    end_date: m.endDate.toISOString(),
+    created_at: m.createdAt.toISOString(),
+    payment_method: m.paymentMethod ?? undefined,
+    user_id: m.userId,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <UserNav userName={profile?.full_name || user.email || "Usuario"} />
-
+      <UserNav userName={profile?.fullName || session.name || "Usuario"} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header con botón de cambiar contraseña */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">👤 Mi Perfil</h1>
@@ -59,7 +47,6 @@ export default async function UserProfilePage() {
           <ChangePasswordButton />
         </div>
 
-        {/* Información Personal */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold text-white mb-4">
             📋 Información Personal
@@ -67,7 +54,7 @@ export default async function UserProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gray-700/50 rounded-lg p-4">
               <p className="text-gray-400 text-sm mb-1">Nombre Completo</p>
-              <p className="text-white font-medium">{profile?.full_name}</p>
+              <p className="text-white font-medium">{profile?.fullName}</p>
             </div>
             <div className="bg-gray-700/50 rounded-lg p-4">
               <p className="text-gray-400 text-sm mb-1">DNI</p>
@@ -82,25 +69,36 @@ export default async function UserProfilePage() {
             <div className="bg-gray-700/50 rounded-lg p-4">
               <p className="text-gray-400 text-sm mb-1">Miembro desde</p>
               <p className="text-white font-medium">
-                {new Date(profile?.created_at).toLocaleDateString("es-AR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {profile?.createdAt
+                  ? new Date(profile.createdAt).toLocaleDateString("es-AR", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "N/A"}
               </p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Estado de Membresía */}
           <div className="lg:col-span-2">
-            <MembershipStatus membership={membership} />
+            <MembershipStatus
+              membership={
+                membership
+                  ? {
+                      ...membership,
+                      plan_type: membership.planType,
+                      start_date: membership.startDate.toISOString(),
+                      end_date: membership.endDate.toISOString(),
+                      status: membership.status,
+                    }
+                  : null
+              }
+            />
           </div>
-
-          {/* Historial de Pagos */}
           <div>
-            <MembershipHistory memberships={allMemberships || []} />
+            <MembershipHistory memberships={allMembershipsForComponent} />
           </div>
         </div>
       </main>

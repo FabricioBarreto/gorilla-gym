@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 interface ExerciseImage {
@@ -11,7 +10,6 @@ interface ExerciseImage {
   image_url: string;
   order_index: number;
 }
-
 interface Exercise {
   id: string;
   name: string;
@@ -20,7 +18,6 @@ interface Exercise {
   instructions?: string;
   exercise_images?: ExerciseImage[];
 }
-
 interface RoutineExercise {
   id: string;
   sets: number;
@@ -30,7 +27,6 @@ interface RoutineExercise {
   order_index: number;
   exercise: Exercise;
 }
-
 interface Routine {
   id: string;
   name: string;
@@ -38,15 +34,10 @@ interface Routine {
   updated_at: string;
   routine_exercises: RoutineExercise[];
 }
-
 interface Assignment {
   id: string;
   assigned_at: string;
-  profile: {
-    id: string;
-    full_name: string;
-    dni?: string;
-  };
+  profile: { id: string; full_name: string; dni?: string };
 }
 
 interface RoutineDetailProps {
@@ -56,7 +47,6 @@ interface RoutineDetailProps {
 
 export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [removing, setRemoving] = useState<string | null>(null);
 
   const sortedExercises = [...routine.routine_exercises].sort(
@@ -65,20 +55,25 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
 
   const handleRemoveAssignment = async (assignmentId: string) => {
     if (!confirm("¿Estás seguro de quitar esta rutina del alumno?")) return;
-
     setRemoving(assignmentId);
     try {
-      const { error } = await supabase
-        .from("routine_assignments")
-        .delete()
-        .eq("id", assignmentId);
+      // Buscamos el userId del assignment para usar la API DELETE
+      const assignment = assignments.find((a) => a.id === assignmentId);
+      if (!assignment) throw new Error("Asignación no encontrada");
 
-      if (error) throw error;
-
+      const res = await fetch("/api/routine-assignments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          routineId: routine.id,
+          userId: assignment.profile.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       router.refresh();
-    } catch (err) {
-      console.error("Error:", err);
-      alert("Error al quitar la asignación");
+    } catch (err: any) {
+      alert("Error al quitar la asignación: " + err.message);
     } finally {
       setRemoving(null);
     }
@@ -86,7 +81,6 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
 
   return (
     <div className="space-y-6">
-      {/* Encabezado */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex items-start justify-between">
           <div>
@@ -107,7 +101,6 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
             </Link>
           </div>
         </div>
-
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-700/30 rounded-lg p-4">
             <p className="text-gray-400 text-sm">Total ejercicios</p>
@@ -130,7 +123,6 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
         </div>
       </div>
 
-      {/* Alumnos asignados */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-white">
@@ -143,7 +135,6 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
             Asignar a más alumnos →
           </Link>
         </div>
-
         {assignments.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-400 mb-4">
@@ -196,12 +187,10 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
         )}
       </div>
 
-      {/* Ejercicios */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <h2 className="text-xl font-bold text-white mb-6">
           🏋️ Ejercicios de la Rutina
         </h2>
-
         <div className="space-y-4">
           {sortedExercises.map((routineEx, index) => (
             <div
@@ -209,12 +198,9 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
               className="bg-gray-700/30 border border-gray-600/50 rounded-lg p-5"
             >
               <div className="flex items-start gap-4">
-                {/* Número */}
                 <div className="flex-shrink-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold">{index + 1}</span>
                 </div>
-
-                {/* Imagen del ejercicio */}
                 {routineEx.exercise.exercise_images?.[0] && (
                   <div className="flex-shrink-0 w-24 h-24 relative rounded-lg overflow-hidden">
                     <Image
@@ -225,48 +211,30 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
                     />
                   </div>
                 )}
-
-                {/* Contenido */}
                 <div className="flex-1">
-                  <div className="mb-3">
-                    <h3 className="text-xl font-bold text-white mb-1">
-                      {routineEx.exercise.name}
-                    </h3>
-                    <p className="text-gray-400 text-sm">
-                      {routineEx.exercise.muscle_group}
-                    </p>
-                  </div>
-
-                  {/* Stats */}
+                  <h3 className="text-xl font-bold text-white mb-1">
+                    {routineEx.exercise.name}
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-3">
+                    {routineEx.exercise.muscle_group}
+                  </p>
                   <div className="grid grid-cols-3 gap-4 mb-3">
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-400 text-xs mb-1">Series</p>
-                      <p className="text-white font-bold text-lg">
-                        {routineEx.sets}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-400 text-xs mb-1">Repeticiones</p>
-                      <p className="text-white font-bold text-lg">
-                        {routineEx.reps}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-3">
-                      <p className="text-gray-400 text-xs mb-1">Descanso</p>
-                      <p className="text-white font-bold text-lg">
-                        {routineEx.rest_seconds}s
-                      </p>
-                    </div>
+                    {[
+                      ["Series", routineEx.sets],
+                      ["Repeticiones", routineEx.reps],
+                      ["Descanso", `${routineEx.rest_seconds}s`],
+                    ].map(([label, val]) => (
+                      <div key={label} className="bg-gray-800 rounded-lg p-3">
+                        <p className="text-gray-400 text-xs mb-1">{label}</p>
+                        <p className="text-white font-bold text-lg">{val}</p>
+                      </div>
+                    ))}
                   </div>
-
-                  {/* Descripción */}
                   {routineEx.exercise.description && (
                     <p className="text-gray-300 text-sm mb-3">
                       {routineEx.exercise.description}
                     </p>
                   )}
-
-                  {/* Notas del entrenador */}
                   {routineEx.notes && (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3">
                       <p className="text-blue-300 text-sm">
@@ -277,8 +245,6 @@ export function RoutineDetail({ routine, assignments }: RoutineDetailProps) {
                       </p>
                     </div>
                   )}
-
-                  {/* Instrucciones */}
                   {routineEx.exercise.instructions && (
                     <details className="group">
                       <summary className="cursor-pointer text-green-400 text-sm font-medium hover:text-green-300 list-none">

@@ -1,60 +1,57 @@
-import { createAdminSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { MembersList } from "@/components/admin/MembersList";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
 export default async function MembersPage() {
-  const supabase = await createAdminSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const allMembers = await prisma.profile.findMany({
+    where: { role: "member" },
+    orderBy: { createdAt: "desc" },
+  });
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    redirect("/dashboard");
-  }
-
-  // Obtener todos los miembros
-  const { data: allMembers } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("role", "member")
-    .order("created_at", { ascending: false });
-
-  // Para cada miembro, obtener su membresía ACTIVA más reciente
   const membersWithMemberships = await Promise.all(
-    (allMembers || []).map(async (member) => {
-      const { data: membership } = await supabase
-        .from("memberships")
-        .select("id, plan_type, start_date, end_date, status")
-        .eq("user_id", member.id)
-        .eq("status", "active") // ← SOLO ACTIVAS
-        .order("end_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(); // ← Puede ser null
+    allMembers.map(async (member) => {
+      const membership = await prisma.membership.findFirst({
+        where: { userId: member.id, status: "active" },
+        orderBy: { endDate: "desc" },
+        select: {
+          id: true,
+          planType: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+        },
+      });
 
       return {
         ...member,
-        memberships: membership ? [membership] : [],
+        full_name: member.fullName,
+        created_at: member.createdAt.toISOString(),
+        phone: member.phone ?? undefined,
+        memberships: membership
+          ? [
+              {
+                id: membership.id,
+                plan_type: membership.planType,
+                start_date: membership.startDate.toISOString().split("T")[0],
+                end_date: membership.endDate.toISOString().split("T")[0],
+                status: membership.status as "active" | "expired" | "suspended",
+              },
+            ]
+          : [],
       };
     }),
   );
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
-
+      <AdminNav userName={session.name} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -65,7 +62,6 @@ export default async function MembersPage() {
               Administra todos los miembros del gimnasio
             </p>
           </div>
-
           <Link
             href="/admin/members/new"
             className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -74,7 +70,6 @@ export default async function MembersPage() {
             <span>Agregar Alumno</span>
           </Link>
         </div>
-
         <MembersList members={membersWithMemberships} />
       </main>
     </div>

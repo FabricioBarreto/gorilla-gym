@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
 import { OfflineIndicator } from "./OfflineIndicator";
 
 interface UserNavProps {
@@ -11,10 +10,9 @@ interface UserNavProps {
 
 export function UserNav({ userName }: UserNavProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   };
@@ -24,13 +22,11 @@ export function UserNav({ userName }: UserNavProps) {
       <nav className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
             <Link href="/dashboard" className="flex items-center space-x-2">
               <span className="text-2xl">🦍</span>
               <span className="text-xl font-bold text-white">Gorila GYM</span>
             </Link>
 
-            {/* Navigation Links - Desktop */}
             <div className="hidden md:flex items-center space-x-1">
               <Link
                 href="/dashboard"
@@ -40,13 +36,11 @@ export function UserNav({ userName }: UserNavProps) {
               </Link>
             </div>
 
-            {/* User Menu */}
             <div className="flex items-center space-x-4">
               <div className="hidden md:block text-right">
                 <p className="text-sm font-medium text-white">{userName}</p>
                 <p className="text-xs text-gray-400">Usuario</p>
               </div>
-
               <div className="flex items-center space-x-2">
                 <Link
                   href="/dashboard/profile"
@@ -55,7 +49,6 @@ export function UserNav({ userName }: UserNavProps) {
                 >
                   Mi Perfil 👤
                 </Link>
-
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
@@ -66,7 +59,6 @@ export function UserNav({ userName }: UserNavProps) {
             </div>
           </div>
 
-          {/* Mobile Navigation */}
           <div className="md:hidden pb-3 space-y-1">
             <Link
               href="/dashboard"
@@ -89,8 +81,6 @@ export function UserNav({ userName }: UserNavProps) {
           </div>
         </div>
       </nav>
-
-      {/* Indicador de modo offline */}
       <OfflineIndicator />
     </>
   );

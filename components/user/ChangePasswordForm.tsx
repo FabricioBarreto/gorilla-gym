@@ -1,20 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export function ChangePasswordForm() {
   const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showForm, setShowForm] = useState(false);
-
   const [formData, setFormData] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
@@ -24,51 +19,22 @@ export function ChangePasswordForm() {
     setLoading(true);
     setError(null);
     setSuccess(false);
-
     try {
-      // Validaciones
-      if (formData.newPassword.length < 6) {
+      if (formData.newPassword.length < 6)
         throw new Error("La nueva contraseña debe tener al menos 6 caracteres");
-      }
-
-      if (formData.newPassword !== formData.confirmPassword) {
+      if (formData.newPassword !== formData.confirmPassword)
         throw new Error("Las contraseñas no coinciden");
-      }
 
-      // Verificar contraseña actual
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user?.email) {
-        throw new Error("No se pudo obtener el usuario");
-      }
-
-      // Intentar login con contraseña actual para verificarla
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: formData.currentPassword,
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: formData.newPassword }),
       });
-
-      if (signInError) {
-        throw new Error("La contraseña actual es incorrecta");
-      }
-
-      // Cambiar contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: formData.newPassword,
-      });
-
-      if (updateError) throw updateError;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       setSuccess(true);
-      setFormData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-
-      // Ocultar formulario después de 3 segundos
+      setFormData({ newPassword: "", confirmPassword: "" });
       setTimeout(() => {
         setShowForm(false);
         setSuccess(false);
@@ -78,17 +44,6 @@ export function ChangePasswordForm() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setFormData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setError(null);
-    setSuccess(false);
   };
 
   if (!showForm) {
@@ -107,13 +62,11 @@ export function ChangePasswordForm() {
       <h3 className="text-xl font-bold text-white mb-4">
         🔒 Cambiar Contraseña
       </h3>
-
       {error && (
         <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
-
       {success && (
         <div className="mb-4 bg-green-500/10 border border-green-500/20 rounded-lg p-3">
           <p className="text-green-400 text-sm">
@@ -123,22 +76,6 @@ export function ChangePasswordForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Contraseña Actual *
-          </label>
-          <input
-            type="password"
-            required
-            value={formData.currentPassword}
-            onChange={(e) =>
-              setFormData({ ...formData, currentPassword: e.target.value })
-            }
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ingresa tu contraseña actual"
-          />
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Nueva Contraseña *
@@ -155,7 +92,6 @@ export function ChangePasswordForm() {
             placeholder="Mínimo 6 caracteres"
           />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Confirmar Nueva Contraseña *
@@ -172,11 +108,14 @@ export function ChangePasswordForm() {
             placeholder="Repite la nueva contraseña"
           />
         </div>
-
         <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
-            onClick={handleCancel}
+            onClick={() => {
+              setShowForm(false);
+              setFormData({ newPassword: "", confirmPassword: "" });
+              setError(null);
+            }}
             disabled={loading}
             className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
           >

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -10,13 +9,11 @@ interface Member {
   full_name: string;
   dni?: string;
 }
-
 interface ExerciseImage {
   id: string;
   image_url: string;
   order_index: number;
 }
-
 interface Exercise {
   id: string;
   name: string;
@@ -24,7 +21,6 @@ interface Exercise {
   description?: string;
   exercise_images?: ExerciseImage[];
 }
-
 interface RoutineExercise {
   exerciseId: string;
   sets: number;
@@ -47,32 +43,24 @@ export function NewRoutineForm({
   preselectedMember,
 }: NewRoutineFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [routineName, setRoutineName] = useState("");
   const [selectedMember, setSelectedMember] = useState(preselectedMember || "");
   const [selectedExercises, setSelectedExercises] = useState<RoutineExercise[]>(
     [],
   );
-
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGroup, setFilterGroup] = useState("all");
 
-  // Actualizar selectedMember si cambia preselectedMember
   useEffect(() => {
-    if (preselectedMember) {
-      setSelectedMember(preselectedMember);
-    }
+    if (preselectedMember) setSelectedMember(preselectedMember);
   }, [preselectedMember]);
 
   const muscleGroups = [
     "all",
     ...Array.from(new Set(exercises.map((e) => e.muscle_group))),
   ];
-
   const filteredExercises = exercises.filter((ex) => {
     const matchesSearch = ex.name
       .toLowerCase()
@@ -85,7 +73,7 @@ export function NewRoutineForm({
     return matchesSearch && matchesGroup && notSelected;
   });
 
-  const addExercise = (exercise: Exercise) => {
+  const addExercise = (exercise: Exercise) =>
     setSelectedExercises([
       ...selectedExercises,
       {
@@ -96,32 +84,24 @@ export function NewRoutineForm({
         notes: "",
       },
     ]);
-  };
-
-  const removeExercise = (exerciseId: string) => {
+  const removeExercise = (exerciseId: string) =>
     setSelectedExercises(
       selectedExercises.filter((e) => e.exerciseId !== exerciseId),
     );
-  };
-
   const updateExercise = (
     exerciseId: string,
     field: keyof RoutineExercise,
     value: any,
-  ) => {
+  ) =>
     setSelectedExercises(
       selectedExercises.map((e) =>
         e.exerciseId === exerciseId ? { ...e, [field]: value } : e,
       ),
     );
-  };
-
   const moveExercise = (index: number, direction: "up" | "down") => {
     const newExercises = [...selectedExercises];
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-
     if (targetIndex < 0 || targetIndex >= newExercises.length) return;
-
     [newExercises[index], newExercises[targetIndex]] = [
       newExercises[targetIndex],
       newExercises[index],
@@ -133,55 +113,42 @@ export function NewRoutineForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      if (!selectedMember) {
-        throw new Error("Debes seleccionar un alumno");
-      }
-
-      if (selectedExercises.length === 0) {
+      if (!selectedMember) throw new Error("Debes seleccionar un alumno");
+      if (selectedExercises.length === 0)
         throw new Error("Debes agregar al menos un ejercicio");
-      }
-
-      if (!routineName.trim()) {
+      if (!routineName.trim())
         throw new Error("Debes ingresar un nombre para la rutina");
-      }
 
-      // 1. Crear la rutina
-      const { data: routine, error: routineError } = await supabase
-        .from("routines")
-        .insert({
-          user_id: selectedMember,
+      const res = await fetch("/api/routines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: routineName,
-          created_by: adminId,
-        })
-        .select()
-        .single();
+          days: [
+            {
+              day_number: 1,
+              day_name: "Rutina completa",
+              description: "",
+              exercises: selectedExercises.map((ex, index) => ({
+                exerciseId: ex.exerciseId,
+                sets: ex.sets,
+                reps: ex.reps,
+                rest_seconds: ex.rest_seconds,
+                notes: ex.notes || null,
+                order_index: index + 1,
+              })),
+            },
+          ],
+          assignToUserId: selectedMember,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-      if (routineError) throw routineError;
-
-      // 2. Crear los ejercicios de la rutina
-      const routineExercises = selectedExercises.map((ex, index) => ({
-        routine_id: routine.id,
-        exercise_id: ex.exerciseId,
-        sets: ex.sets,
-        reps: ex.reps,
-        rest_seconds: ex.rest_seconds,
-        notes: ex.notes || null,
-        order_index: index + 1,
-      }));
-
-      const { error: exercisesError } = await supabase
-        .from("routine_exercises")
-        .insert(routineExercises);
-
-      if (exercisesError) throw exercisesError;
-
-      // Redirigir
       router.push("/admin/routines");
       router.refresh();
     } catch (err: any) {
-      console.error("Error:", err);
       setError(err.message || "Error al crear la rutina");
       setLoading(false);
     }
@@ -197,12 +164,10 @@ export function NewRoutineForm({
         </div>
       )}
 
-      {/* Información básica */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <h2 className="text-xl font-bold text-white mb-4">
           📋 Información de la Rutina
         </h2>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -222,7 +187,6 @@ export function NewRoutineForm({
               ))}
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Nombre de la Rutina *
@@ -239,25 +203,21 @@ export function NewRoutineForm({
         </div>
       </div>
 
-      {/* Ejercicios seleccionados */}
       {selectedExercises.length > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-xl font-bold text-white mb-4">
             ✅ Ejercicios Agregados ({selectedExercises.length})
           </h2>
-
           <div className="space-y-4">
             {selectedExercises.map((routineEx, index) => {
               const exercise = getExerciseById(routineEx.exerciseId);
               if (!exercise) return null;
-
               return (
                 <div
                   key={routineEx.exerciseId}
                   className="bg-gray-700/50 border border-gray-600 rounded-lg p-4"
                 >
                   <div className="flex items-start gap-4">
-                    {/* Número y controles de orden */}
                     <div className="flex flex-col items-center space-y-2">
                       <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-bold">
@@ -283,8 +243,6 @@ export function NewRoutineForm({
                         </button>
                       </div>
                     </div>
-
-                    {/* Info del ejercicio */}
                     <div className="flex-1 space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
@@ -303,84 +261,64 @@ export function NewRoutineForm({
                           ✕
                         </button>
                       </div>
-
-                      {/* Configuración */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">
-                            Series
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={routineEx.sets}
-                            onChange={(e) =>
-                              updateExercise(
-                                routineEx.exerciseId,
-                                "sets",
-                                parseInt(e.target.value),
-                              )
-                            }
-                            className="w-full px-3 py-1.5 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">
-                            Repeticiones
-                          </label>
-                          <input
-                            type="text"
-                            value={routineEx.reps}
-                            onChange={(e) =>
-                              updateExercise(
-                                routineEx.exerciseId,
-                                "reps",
-                                e.target.value,
-                              )
-                            }
-                            className="w-full px-3 py-1.5 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            placeholder="10 o 10-12"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">
-                            Descanso (seg)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="15"
-                            value={routineEx.rest_seconds}
-                            onChange={(e) =>
-                              updateExercise(
-                                routineEx.exerciseId,
-                                "rest_seconds",
-                                parseInt(e.target.value),
-                              )
-                            }
-                            className="w-full px-3 py-1.5 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                          />
-                        </div>
+                        {[
+                          {
+                            label: "Series",
+                            field: "sets" as const,
+                            type: "number",
+                            min: 1,
+                            max: 10,
+                          },
+                          {
+                            label: "Repeticiones",
+                            field: "reps" as const,
+                            type: "text",
+                          },
+                          {
+                            label: "Descanso (seg)",
+                            field: "rest_seconds" as const,
+                            type: "number",
+                            min: 0,
+                            max: 300,
+                            step: 15,
+                          },
+                        ].map(({ label, field, type, ...rest }) => (
+                          <div key={field}>
+                            <label className="block text-xs text-gray-400 mb-1">
+                              {label}
+                            </label>
+                            <input
+                              type={type}
+                              value={routineEx[field]}
+                              onChange={(e) =>
+                                updateExercise(
+                                  routineEx.exerciseId,
+                                  field,
+                                  type === "number"
+                                    ? parseInt(e.target.value)
+                                    : e.target.value,
+                                )
+                              }
+                              className="w-full px-3 py-1.5 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              {...rest}
+                            />
+                          </div>
+                        ))}
                       </div>
-
-                      {/* Notas */}
-                      <div>
-                        <input
-                          type="text"
-                          value={routineEx.notes}
-                          onChange={(e) =>
-                            updateExercise(
-                              routineEx.exerciseId,
-                              "notes",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                          placeholder="Notas para el alumno (opcional)..."
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={routineEx.notes}
+                        onChange={(e) =>
+                          updateExercise(
+                            routineEx.exerciseId,
+                            "notes",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Notas para el alumno (opcional)..."
+                      />
                     </div>
                   </div>
                 </div>
@@ -390,13 +328,10 @@ export function NewRoutineForm({
         </div>
       )}
 
-      {/* Agregar ejercicios */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <h2 className="text-xl font-bold text-white mb-4">
           ➕ Agregar Ejercicios
         </h2>
-
-        {/* Filtros */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div className="relative">
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -425,8 +360,6 @@ export function NewRoutineForm({
               ))}
           </select>
         </div>
-
-        {/* Grid de ejercicios */}
         {filteredExercises.length === 0 ? (
           <p className="text-gray-400 text-center py-8">
             {searchTerm || filterGroup !== "all"
@@ -462,7 +395,6 @@ export function NewRoutineForm({
         )}
       </div>
 
-      {/* Botones */}
       <div className="flex items-center justify-end space-x-4 bg-gray-800 border border-gray-700 rounded-lg p-6">
         <button
           type="button"

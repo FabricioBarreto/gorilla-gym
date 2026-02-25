@@ -1,19 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export function NewExerciseForm() {
   const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-
   const [formData, setFormData] = useState({
     name: "",
     muscle_group: "Pecho",
@@ -24,36 +20,33 @@ export function NewExerciseForm() {
   const muscleGroups = [
     "Pecho",
     "Espalda",
-    "Piernas",
     "Hombros",
+    "Bíceps",
+    "Tríceps",
     "Brazos",
-    "Abdomen",
+    "Cuádriceps",
+    "Isquiotibiales",
     "Glúteos",
-    "Cardio",
+    "Abdomen",
+    "Piernas",
+    "Pantorrillas",
+    "Core",
   ];
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-
     if (files.length === 0) return;
-
-    // Limitar a 5 imágenes
     if (files.length > 5) {
       setError("Máximo 5 imágenes por ejercicio");
       return;
     }
-
     setImageFiles(files);
-
-    // Crear previews
     const previews: string[] = [];
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         previews.push(reader.result as string);
-        if (previews.length === files.length) {
-          setImagePreviews(previews);
-        }
+        if (previews.length === files.length) setImagePreviews(previews);
       };
       reader.readAsDataURL(file);
     });
@@ -64,71 +57,51 @@ export function NewExerciseForm() {
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `exercises/${fileName}`;
+  // Convierte File a base64 para enviar a la API de upload
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
-    const { error: uploadError } = await supabase.storage
-      .from("exercise-images")
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from("exercise-images")
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
+  const uploadImages = async (files: File[]): Promise<string[]> => {
+    const base64Images = await Promise.all(files.map(fileToBase64));
+    const res = await fetch("/api/upload/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ images: base64Images, bucket: "exercise-images" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al subir imágenes");
+    return data.urls;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      // Validar que haya al menos una imagen
-      if (imageFiles.length === 0) {
+      if (imageFiles.length === 0)
         throw new Error("Debes subir al menos una imagen del ejercicio");
-      }
 
-      // 1. Crear el ejercicio
-      const { data: exercise, error: insertError } = await supabase
-        .from("exercises")
-        .insert({
-          name: formData.name,
-          muscle_group: formData.muscle_group,
-          description: formData.description || null,
-          instructions: formData.instructions || null,
-        })
-        .select()
-        .single();
+      // 1. Subir imágenes
+      const imageUrls = await uploadImages(imageFiles);
 
-      if (insertError) throw insertError;
+      // 2. Crear ejercicio con URLs
+      const res = await fetch("/api/exercises", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, image_urls: imageUrls }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-      // 2. Subir todas las imágenes
-      const uploadPromises = imageFiles.map((file) => uploadImage(file));
-      const imageUrls = await Promise.all(uploadPromises);
-
-      // 3. Guardar las URLs en exercise_images
-      const imageRecords = imageUrls.map((url, index) => ({
-        exercise_id: exercise.id,
-        image_url: url,
-        order_index: index,
-      }));
-
-      const { error: imagesError } = await supabase
-        .from("exercise_images")
-        .insert(imageRecords);
-
-      if (imagesError) throw imagesError;
-
-      // Redirigir a la lista
       router.push("/admin/exercises");
       router.refresh();
     } catch (err: any) {
-      console.error("Error:", err);
       setError(err.message || "Error al crear el ejercicio");
       setLoading(false);
     }
@@ -144,14 +117,11 @@ export function NewExerciseForm() {
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
-
       <div className="space-y-6">
-        {/* Información Básica */}
         <div>
           <h2 className="text-xl font-bold text-white mb-4">
             📋 Información Básica
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -168,7 +138,6 @@ export function NewExerciseForm() {
                 placeholder="Press de Banca"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Grupo Muscular *
@@ -188,7 +157,6 @@ export function NewExerciseForm() {
                 ))}
               </select>
             </div>
-
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Descripción Breve
@@ -206,12 +174,10 @@ export function NewExerciseForm() {
           </div>
         </div>
 
-        {/* Imágenes */}
         <div>
           <h2 className="text-xl font-bold text-white mb-4">
             🖼️ Imágenes del Ejercicio *
           </h2>
-
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -226,10 +192,9 @@ export function NewExerciseForm() {
               />
               <p className="text-gray-400 text-xs mt-1">
                 JPG, PNG o GIF. Sube varias imágenes para mostrar la ejecución
-                del ejercicio paso a paso.
+                paso a paso.
               </p>
             </div>
-
             {imagePreviews.length > 0 && (
               <div>
                 <p className="text-sm text-gray-300 mb-3">
@@ -266,12 +231,10 @@ export function NewExerciseForm() {
           </div>
         </div>
 
-        {/* Instrucciones */}
         <div>
           <h2 className="text-xl font-bold text-white mb-4">
             📝 Instrucciones
           </h2>
-
           <textarea
             value={formData.instructions}
             onChange={(e) =>
@@ -279,7 +242,9 @@ export function NewExerciseForm() {
             }
             rows={8}
             className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-            placeholder="1. Acostarse en el banco con los pies firmes en el suelo&#10;2. Agarrar la barra con las manos al ancho de los hombros&#10;3. Bajar controladamente hasta el pecho&#10;4. Empujar hacia arriba hasta extender los brazos completamente"
+            placeholder={
+              "1. Acostarse en el banco con los pies firmes en el suelo\n2. Agarrar la barra con las manos al ancho de los hombros\n3. Bajar controladamente hasta el pecho\n4. Empujar hacia arriba hasta extender los brazos completamente"
+            }
           />
           <p className="text-gray-400 text-xs mt-1">
             Escribe las instrucciones paso a paso. Usa saltos de línea para cada
@@ -287,7 +252,6 @@ export function NewExerciseForm() {
           </p>
         </div>
 
-        {/* Botones */}
         <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-700">
           <button
             type="button"

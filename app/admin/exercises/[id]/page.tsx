@@ -1,55 +1,50 @@
-import { createAdminSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect, notFound } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { ExerciseDetail } from "@/components/admin/ExerciseDetail";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
-interface PageProps {
+export default async function ExerciseDetailPage({
+  params,
+}: {
   params: Promise<{ id: string }>;
-}
-
-export default async function ExerciseDetailPage({ params }: PageProps) {
+}) {
   const { id } = await params;
-  const supabase = await createAdminSupabaseClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/dashboard");
 
-  if (!user) {
-    redirect("/login");
-  }
+  const exercise = await prisma.exercise.findUnique({
+    where: { id },
+    include: { images: true },
+  });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, full_name")
-    .eq("id", user.id)
-    .single();
+  if (!exercise) notFound();
 
-  if (profile?.role !== "admin") {
-    redirect("/dashboard");
-  }
-
-  // Obtener el ejercicio completo con imágenes
-  const { data: exercise, error } = await supabase
-    .from("exercises")
-    .select(
-      `
-      *,
-      exercise_images (*)
-    `,
-    )
-    .eq("id", id)
-    .single();
-
-  if (error || !exercise) {
-    notFound();
-  }
+  // Adaptar al formato que espera ExerciseDetail (snake_case)
+  const exerciseForComponent = {
+    ...exercise,
+    muscle_group: exercise.muscleGroup,
+    image_url: exercise.imageUrl ?? undefined,
+    video_url: exercise.videoUrl ?? undefined,
+    description: exercise.description ?? undefined,
+    instructions: exercise.instructions ?? undefined,
+    created_at: exercise.createdAt.toISOString(),
+    updated_at: exercise.updatedAt.toISOString(),
+    exercise_images: exercise.images.map((img) => ({
+      ...img,
+      image_url: img.imageUrl,
+      exercise_id: img.exerciseId,
+      order_index: img.orderIndex,
+      created_at: img.createdAt.toISOString(),
+    })),
+  };
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <AdminNav userName={profile?.full_name || user.email || "Admin"} />
-
+      <AdminNav userName={session.name} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -59,8 +54,7 @@ export default async function ExerciseDetailPage({ params }: PageProps) {
             ← Volver a ejercicios
           </Link>
         </div>
-
-        <ExerciseDetail exercise={exercise} />
+        <ExerciseDetail exercise={exerciseForComponent} />
       </main>
     </div>
   );

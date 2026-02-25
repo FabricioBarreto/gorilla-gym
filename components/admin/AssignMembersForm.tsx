@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 interface Member {
@@ -23,11 +22,8 @@ export function AssignMembersForm({
   routineName,
   members,
   assignedUserIds,
-  adminId,
 }: AssignMembersFormProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,15 +43,25 @@ export function AssignMembersForm({
     setLoading(true);
     setError(null);
     try {
-      const assignments = selected.map((memberId) => ({
-        routine_id: routineId,
-        user_id: memberId,
-        assigned_by: adminId,
-      }));
-      const { error: insertError } = await supabase
-        .from("routine_assignments")
-        .insert(assignments);
-      if (insertError) throw insertError;
+      // Asignar a todos los seleccionados en paralelo
+      const results = await Promise.allSettled(
+        selected.map((memberId) =>
+          fetch("/api/routine-assignments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ routineId, userId: memberId }),
+          }).then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            return data;
+          }),
+        ),
+      );
+
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0)
+        throw new Error(`${failed.length} asignación(es) fallaron`);
+
       setSuccess(true);
       router.refresh();
       setTimeout(() => router.push(`/admin/routines/${routineId}`), 1500);
@@ -131,7 +137,7 @@ export function AssignMembersForm({
                     )}
                   </div>
                   {selected.includes(member.id) && (
-                    <span className="text-green-400 text-lg">OK</span>
+                    <span className="text-green-400 text-lg">✓</span>
                   )}
                 </div>
               </button>

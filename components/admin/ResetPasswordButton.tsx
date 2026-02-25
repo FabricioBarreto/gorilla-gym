@@ -1,8 +1,8 @@
 "use client";
-
+// ============================================================
+// ARCHIVO: components/admin/ResetPasswordButton.tsx
+// ============================================================
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 
 interface ResetPasswordButtonProps {
   userId: string;
@@ -12,12 +12,8 @@ interface ResetPasswordButtonProps {
 
 export function ResetPasswordButton({
   userId,
-  userEmail,
   userName,
 }: ResetPasswordButtonProps) {
-  const router = useRouter();
-  const supabase = createClient();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string | null>(null);
@@ -25,14 +21,12 @@ export function ResetPasswordButton({
   const [tempPassword, setTempPassword] = useState("");
 
   const generatePassword = () => {
-    // Generar contraseña aleatoria de 8 caracteres
     const chars =
       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let password = "";
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
+    return Array.from(
+      { length: 8 },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join("");
   };
 
   const handleReset = async () => {
@@ -40,54 +34,33 @@ export function ResetPasswordButton({
       setError("Debes ingresar una contraseña");
       return;
     }
-
     if (tempPassword.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres");
       return;
     }
-
-    if (!confirm(`¿Estás seguro de resetear la contraseña de ${userName}?`)) {
+    if (!confirm(`¿Estás seguro de resetear la contraseña de ${userName}?`))
       return;
-    }
 
     setLoading(true);
     setError(null);
-
     try {
-      // Usar la API de admin para actualizar la contraseña
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        userId,
-        { password: tempPassword },
-      );
-
-      if (updateError) throw updateError;
-
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, newPassword: tempPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setNewPassword(tempPassword);
       setTempPassword("");
-
-      // Ocultar después de mostrar la contraseña
       setTimeout(() => {
         setShowForm(false);
         setNewPassword(null);
-      }, 30000); // 30 segundos para copiar
+      }, 30000);
     } catch (err: any) {
       setError(err.message || "Error al resetear la contraseña");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setShowForm(false);
-    setTempPassword("");
-    setError(null);
-    setNewPassword(null);
-  };
-
-  const copyToClipboard = () => {
-    if (newPassword) {
-      navigator.clipboard.writeText(newPassword);
-      alert("Contraseña copiada al portapapeles");
     }
   };
 
@@ -107,7 +80,6 @@ export function ResetPasswordButton({
       <h3 className="text-xl font-bold text-white mb-4">
         🔑 Resetear Contraseña
       </h3>
-
       {error && (
         <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
           <p className="text-red-400 text-sm">{error}</p>
@@ -125,7 +97,7 @@ export function ResetPasswordButton({
               <div className="flex items-center justify-between">
                 <p className="text-white font-mono text-lg">{newPassword}</p>
                 <button
-                  onClick={copyToClipboard}
+                  onClick={() => navigator.clipboard.writeText(newPassword)}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                 >
                   📋 Copiar
@@ -136,9 +108,11 @@ export function ResetPasswordButton({
               ⚠️ Guarda esta contraseña ahora. Desaparecerá en 30 segundos.
             </p>
           </div>
-
           <button
-            onClick={handleCancel}
+            onClick={() => {
+              setShowForm(false);
+              setNewPassword(null);
+            }}
             className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
           >
             Cerrar
@@ -151,7 +125,6 @@ export function ResetPasswordButton({
               ⚠️ Esto cambiará la contraseña de <strong>{userName}</strong>
             </p>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Nueva Contraseña
@@ -172,15 +145,14 @@ export function ResetPasswordButton({
                 🎲 Generar
               </button>
             </div>
-            <p className="text-gray-400 text-xs mt-1">
-              Puedes escribir una contraseña personalizada o generar una
-              aleatoria
-            </p>
           </div>
-
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
             <button
-              onClick={handleCancel}
+              onClick={() => {
+                setShowForm(false);
+                setTempPassword("");
+                setError(null);
+              }}
               disabled={loading}
               className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
             >

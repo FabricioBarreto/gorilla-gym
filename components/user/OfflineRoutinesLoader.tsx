@@ -71,9 +71,11 @@ export function OfflineRoutinesLoader({
     dayCount: routine.routine_days?.length || 0,
   }));
 
-  const menRoutines = routinesWithCount.filter((r) => r.category === "hombres");
+  const menRoutines = routinesWithCount.filter(
+    (r) => r.category?.toLowerCase() === "hombres",
+  );
   const womenRoutines = routinesWithCount.filter(
-    (r) => r.category === "mujeres",
+    (r) => r.category?.toLowerCase() === "mujeres",
   );
 
   return (

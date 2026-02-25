@@ -1,42 +1,27 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 
-// Para usuarios normales - respeta RLS y sesión
-export async function createServerSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
-        set(name: string, value: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value, ...options }); } catch {}
-        },
-        remove(name: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value: "", ...options }); } catch {}
-        },
-      },
-    },
-  );
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET ??
+    "gorilla-gym-super-secret-key-change-in-production-2026",
+);
+
+export interface SessionUser {
+  id: string;
+  dni: string;
+  role: string;
+  name: string;
 }
 
-// Para admin - bypasea RLS
-export async function createAdminSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
-        set(name: string, value: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value, ...options }); } catch {}
-        },
-        remove(name: string, options: CookieOptions) {
-          try { cookieStore.set({ name, value: "", ...options }); } catch {}
-        },
-      },
-    },
-  );
+export async function getSession(): Promise<SessionUser | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth-token")?.value;
+    if (!token) return null;
+
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return payload as unknown as SessionUser;
+  } catch {
+    return null;
+  }
 }

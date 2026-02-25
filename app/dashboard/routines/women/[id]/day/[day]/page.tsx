@@ -1,8 +1,9 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSession } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { UserNav } from "@/components/user/UserNav";
 import { DayExercises } from "@/components/user/DayExercises";
 import Link from "next/link";
+import prisma from "@/lib/prisma";
 
 export default async function WomenDayExercisesPage({
   params,
@@ -12,60 +13,62 @@ export default async function WomenDayExercisesPage({
   const { id, day } = await params;
   const dayNumber = parseInt(day);
 
-  const supabase = await createServerSupabaseClient();
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (session.role === "admin") redirect("/admin");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await prisma.profile.findUnique({
+    where: { id: session.id },
+    select: { fullName: true },
+  });
 
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "admin") redirect("/admin");
-
-  // Obtener rutina
-  const { data: routine } = await supabase
-    .from("routines")
-    .select("*")
-    .eq("id", id)
-    .single();
-
+  const routine = await prisma.routine.findUnique({
+    where: { id },
+    select: { id: true },
+  });
   if (!routine) redirect("/dashboard/routines/women");
 
-  // Obtener el día específico
-  const { data: routineDay } = await supabase
-    .from("routine_days")
-    .select("*")
-    .eq("routine_id", id)
-    .eq("day_number", dayNumber)
-    .single();
-
+  const routineDay = await prisma.routineDay.findFirst({
+    where: { routineId: id, dayNumber },
+  });
   if (!routineDay) redirect(`/dashboard/routines/women/${id}`);
 
-  // Obtener ejercicios del día
-  const { data: exercises } = await supabase
-    .from("routine_exercises")
-    .select(
-      `
-      *,
-      exercise:exercises (
-        *,
-        exercise_images (*)
-      )
-    `,
-    )
-    .eq("routine_day_id", routineDay.id)
-    .order("order_index");
+  const exercises = await prisma.routineExercise.findMany({
+    where: { routineDayId: routineDay.id },
+    orderBy: { orderIndex: "asc" },
+    include: { exercise: { include: { images: true } } },
+  });
+
+  const exercisesForComponent = exercises.map((re) => ({
+    ...re,
+    notes: re.notes ?? undefined,
+    routine_day_id: re.routineDayId,
+    exercise_id: re.exerciseId,
+    rest_seconds: re.restSeconds,
+    order_index: re.orderIndex,
+    created_at: re.createdAt.toISOString(),
+    exercise: {
+      ...re.exercise,
+      description: re.exercise.description ?? undefined, // ← dentro de exercise
+      instructions: re.exercise.instructions ?? undefined, // ← dentro de exercise
+      muscle_group: re.exercise.muscleGroup,
+      image_url: re.exercise.imageUrl,
+      video_url: re.exercise.videoUrl,
+      created_at: re.exercise.createdAt.toISOString(),
+      updated_at: re.exercise.updatedAt.toISOString(),
+      exercise_images: re.exercise.images.map((img) => ({
+        ...img,
+        image_url: img.imageUrl,
+        exercise_id: img.exerciseId,
+        order_index: img.orderIndex,
+        created_at: img.createdAt.toISOString(),
+      })),
+    },
+  }));
 
   return (
     <div className="min-h-screen bg-gray-900">
-      <UserNav userName={profile?.full_name || user.email || "Usuario"} />
-
+      <UserNav userName={profile?.fullName || session.name || "Usuario"} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <Link
@@ -74,29 +77,21 @@ export default async function WomenDayExercisesPage({
           >
             ← Volver a días
           </Link>
-
-          <div className="flex items-center space-x-3 mb-2">
-            <div>
-              <div className="text-pink-400 font-bold text-sm mb-1">
-                DÍA {routineDay.day_number}
-              </div>
-              <h1 className="text-4xl font-bold text-white">
-                {routineDay.day_name}
-              </h1>
-            </div>
+          <div className="text-pink-400 font-bold text-sm mb-1">
+            DÍA {routineDay.dayNumber}
           </div>
-
+          <h1 className="text-4xl font-bold text-white">
+            {routineDay.dayName}
+          </h1>
           {routineDay.description && (
             <p className="text-gray-400 mt-2">{routineDay.description}</p>
           )}
-
           <p className="text-gray-500 text-sm mt-4">
-            {exercises?.length || 0} ejercicio
-            {exercises?.length !== 1 ? "s" : ""} programados
+            {exercises.length} ejercicio{exercises.length !== 1 ? "s" : ""}{" "}
+            programados
           </p>
         </div>
-
-        <DayExercises exercises={exercises || []} />
+        <DayExercises exercises={exercisesForComponent} />
       </main>
     </div>
   );

@@ -1,17 +1,14 @@
 "use client";
-
+// ============================================================
+// ARCHIVO: components/user/ChangePasswordButton.tsx
+// ============================================================
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 
 export function ChangePasswordButton() {
-  const supabase = createClient();
-
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -19,33 +16,26 @@ export function ChangePasswordButton() {
     e.preventDefault();
     setError(null);
     setSuccess(false);
-
-    // Validaciones
     if (newPassword.length < 6) {
       setError("La nueva contraseña debe tener al menos 6 caracteres");
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setError("Las contraseñas no coinciden");
       return;
     }
-
     setLoading(true);
-
     try {
-      // Actualizar contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
       });
-
-      if (updateError) throw updateError;
-
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setSuccess(true);
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-
       setTimeout(() => {
         setShowModal(false);
         setSuccess(false);
@@ -67,7 +57,6 @@ export function ChangePasswordButton() {
         <span>Cambiar Contraseña</span>
       </button>
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-md w-full p-6">
@@ -82,13 +71,11 @@ export function ChangePasswordButton() {
                 ✕
               </button>
             </div>
-
             {error && (
               <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                 <p className="text-red-400 text-sm">{error}</p>
               </div>
             )}
-
             {success && (
               <div className="mb-4 bg-green-500/10 border border-green-500/20 rounded-lg p-3">
                 <p className="text-green-400 text-sm">
@@ -96,7 +83,6 @@ export function ChangePasswordButton() {
                 </p>
               </div>
             )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-gray-300 text-sm font-medium mb-2">
@@ -112,7 +98,6 @@ export function ChangePasswordButton() {
                   placeholder="Mínimo 6 caracteres"
                 />
               </div>
-
               <div>
                 <label className="block text-gray-300 text-sm font-medium mb-2">
                   Confirmar Nueva Contraseña
@@ -127,7 +112,6 @@ export function ChangePasswordButton() {
                   placeholder="Repite la nueva contraseña"
                 />
               </div>
-
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
