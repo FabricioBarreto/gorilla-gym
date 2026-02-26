@@ -1,13 +1,10 @@
 // ============================================================
 // ARCHIVO: app/api/upload/images/route.ts
-// POST - Subir imágenes en base64 y retornar URLs públicas
-// Reemplaza supabase.storage.from("exercise-images").upload()
+// POST - Subir imagenes a Supabase Storage
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/supabase-server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,43 +17,49 @@ export async function POST(req: NextRequest) {
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
-        { error: "No se recibieron imágenes" },
+        { error: "No se recibieron imagenes" },
         { status: 400 },
       );
     }
 
-    const uploadDir = join(process.cwd(), "public", "uploads", bucket);
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
 
     const urls: string[] = [];
 
     for (const base64Image of images) {
-      // base64Image puede ser "data:image/jpeg;base64,/9j/..." o solo base64
       const matches = base64Image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new Error("Formato de imagen inválido");
+        throw new Error("Formato de imagen invalido");
       }
 
       const mimeType = matches[1];
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, "base64");
-
-      // Determinar extensión
       const ext = mimeType.split("/")[1] || "jpg";
       const filename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
-      const filepath = join(uploadDir, filename);
 
-      await writeFile(filepath, buffer);
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(filename, buffer, {
+          contentType: mimeType,
+          upsert: false,
+        });
 
-      // URL pública relativa
-      const publicUrl = `/uploads/${bucket}/${filename}`;
-      urls.push(publicUrl);
+      if (error) throw new Error(error.message);
+
+      const { data: publicData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filename);
+
+      urls.push(publicData.publicUrl);
     }
 
     return NextResponse.json({ success: true, urls });
   } catch (error: any) {
+    console.error("Upload error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
