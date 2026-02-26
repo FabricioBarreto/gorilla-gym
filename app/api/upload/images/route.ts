@@ -1,9 +1,9 @@
 // ============================================================
 // ARCHIVO: app/api/upload/images/route.ts
+// POST - Subir imagenes a Cloudinary
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/supabase-server";
-import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,18 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { images, bucket = "exercise-images" } = body;
-
-    console.log("[upload] images count:", images?.length);
-    console.log(
-      "[upload] SUPABASE_URL:",
-      process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30),
-    );
-    console.log(
-      "[upload] SERVICE_KEY exists:",
-      !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    );
+    const { images, bucket = "exercise-images" } = await req.json();
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
@@ -32,63 +21,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
-
-    // Test de conexion a Supabase
-    const { data: buckets, error: bucketsError } =
-      await supabase.storage.listBuckets();
-    console.log(
-      "[upload] buckets:",
-      buckets?.map((b) => b.name),
-      "error:",
-      bucketsError?.message,
-    );
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME!;
+    const apiKey = process.env.CLOUDINARY_API_KEY!;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET!;
 
     const urls: string[] = [];
 
     for (const base64Image of images) {
-      const matches = base64Image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        throw new Error("Formato de imagen invalido");
-      }
+      const formData = new FormData();
+      formData.append("file", base64Image);
+      formData.append("upload_preset", "ml_default");
+      formData.append("folder", bucket);
 
-      const mimeType = matches[1];
-      const base64Data = matches[2];
-      const buffer = Buffer.from(base64Data, "base64");
-      const ext = mimeType.split("/")[1] || "jpg";
-      const filename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
+      // Upload con autenticacion basica
+      const timestamp = Math.round(Date.now() / 1000);
+      const signatureStr = `folder=${bucket}&timestamp=${timestamp}${apiSecret}`;
 
-      console.log(
-        "[upload] uploading:",
-        filename,
-        "size:",
-        buffer.length,
-        "bytes",
+      // Usar upload sin preset (autenticado)
+      const authHeader =
+        "Basic " + Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+
+      const formDataAuth = new FormData();
+      formDataAuth.append("file", base64Image);
+      formDataAuth.append("folder", bucket);
+      formDataAuth.append("timestamp", timestamp.toString());
+      formDataAuth.append("api_key", apiKey);
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: authHeader,
+          },
+          body: formDataAuth,
+        },
       );
 
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(filename, buffer, {
-          contentType: mimeType,
-          upsert: false,
-        });
+      const data = await response.json();
 
-      console.log("[upload] result:", data, "error:", error?.message);
+      if (!response.ok || data.error) {
+        throw new Error(data.error?.message || "Error al subir imagen");
+      }
 
-      if (error) throw new Error(error.message);
-
-      const { data: publicData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filename);
-      urls.push(publicData.publicUrl);
+      urls.push(data.secure_url);
     }
 
     return NextResponse.json({ success: true, urls });
   } catch (error: any) {
-    console.error("[upload] FATAL:", error.message, error.cause);
+    console.error("[upload] error:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
