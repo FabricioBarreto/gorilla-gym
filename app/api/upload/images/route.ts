@@ -22,39 +22,21 @@ export async function POST(req: NextRequest) {
     }
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME!;
-    const apiKey = process.env.CLOUDINARY_API_KEY!;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET!;
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET!; // unsigned preset
 
     const urls: string[] = [];
 
     for (const base64Image of images) {
       const formData = new FormData();
       formData.append("file", base64Image);
-      formData.append("upload_preset", "ml_default");
+      formData.append("upload_preset", uploadPreset);
       formData.append("folder", bucket);
-
-      // Upload con autenticacion basica
-      const timestamp = Math.round(Date.now() / 1000);
-      const signatureStr = `folder=${bucket}&timestamp=${timestamp}${apiSecret}`;
-
-      // Usar upload sin preset (autenticado)
-      const authHeader =
-        "Basic " + Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
-
-      const formDataAuth = new FormData();
-      formDataAuth.append("file", base64Image);
-      formDataAuth.append("folder", bucket);
-      formDataAuth.append("timestamp", timestamp.toString());
-      formDataAuth.append("api_key", apiKey);
 
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
           method: "POST",
-          headers: {
-            Authorization: authHeader,
-          },
-          body: formDataAuth,
+          body: formData,
         },
       );
 
