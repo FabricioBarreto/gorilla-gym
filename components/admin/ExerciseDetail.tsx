@@ -89,25 +89,32 @@ export function ExerciseDetail({ exercise }: { exercise: Exercise }) {
     setUploadingImages(true);
     setError(null);
     try {
-      // 1. Subir imágenes
-      const base64Images = await Promise.all(newImages.map(fileToBase64));
-      const uploadRes = await fetch("/api/upload/images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          images: base64Images,
-          bucket: "exercise-images",
-        }),
-      });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok)
-        throw new Error(uploadData.error || "Error al subir imágenes");
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!;
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!;
 
-      // 2. Guardar URLs en DB
+      // Subir directo a Cloudinary desde el browser (sin pasar por tu servidor)
+      const uploadPromises = newImages.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", uploadPreset);
+        formData.append("folder", "exercise-images");
+
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+          { method: "POST", body: formData },
+        );
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.secure_url as string;
+      });
+
+      const urls = await Promise.all(uploadPromises);
+
+      // Solo mandar las URLs a tu API (payload mínimo)
       const res = await fetch(`/api/exercises/${exercise.id}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_urls: uploadData.urls }),
+        body: JSON.stringify({ image_urls: urls }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
