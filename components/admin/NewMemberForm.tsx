@@ -42,6 +42,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
     plan_type: defaultPlan,
     start_date: new Date().toISOString().split("T")[0],
     amount: defaultPrice,
+    payment_method: "efectivo" as "efectivo" | "transferencia",
   });
 
   const getPriceForPlan = (planType: string) =>
@@ -76,7 +77,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
     setError(null);
     try {
       if (!/^\d{7,8}$/.test(formData.dni))
-        throw new Error("El DNI debe tener 7 u 8 dígitos");
+        throw new Error("El DNI debe tener 7 u 8 digitos");
 
       const res = await fetch("/api/members", {
         method: "POST",
@@ -106,9 +107,10 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
       )}
 
       <div className="space-y-6">
+        {/* Informacion Personal */}
         <div>
           <h2 className="text-xl font-bold text-white mb-4">
-            📋 Información Personal
+            Informacion Personal
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -123,7 +125,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   setFormData({ ...formData, full_name: e.target.value })
                 }
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Juan Pérez"
+                placeholder="Juan Perez"
               />
             </div>
             <div>
@@ -146,12 +148,12 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                 placeholder="12345678"
               />
               <p className="text-gray-400 text-xs mt-1">
-                7 u 8 dígitos sin puntos
+                7 u 8 digitos sin puntos
               </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Teléfono *
+                Telefono *
               </label>
               <input
                 type="tel"
@@ -166,7 +168,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Contraseña Inicial *
+                Contrasena Inicial *
               </label>
               <input
                 type="password"
@@ -177,15 +179,16 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   setFormData({ ...formData, password: e.target.value })
                 }
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Minimo 6 caracteres"
               />
             </div>
           </div>
         </div>
 
+        {/* Membresia */}
         <div>
           <h2 className="text-xl font-bold text-white mb-4">
-            💳 Membresía Inicial
+            Membresia Inicial
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -235,7 +238,7 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   </p>
                   {planDurations[plan.plan_type] && (
                     <p className="text-gray-400 text-xs mt-1">
-                      {planDurations[plan.plan_type]} días
+                      {planDurations[plan.plan_type]} dias
                     </p>
                   )}
                 </div>
@@ -244,8 +247,32 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
           </div>
         </div>
 
+        {/* Metodo de Pago */}
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">💰 Pago Inicial</h2>
+          <h2 className="text-xl font-bold text-white mb-4">Metodo de Pago</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {(["efectivo", "transferencia"] as const).map((method) => (
+              <button
+                key={method}
+                type="button"
+                onClick={() =>
+                  setFormData({ ...formData, payment_method: method })
+                }
+                className={`p-4 rounded-lg border-2 transition-all ${formData.payment_method === method ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-white font-medium capitalize">
+                    {method === "efectivo" ? "Efectivo" : "Transferencia"}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Resumen */}
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4">Pago Inicial</h2>
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -253,13 +280,18 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                 <p className="text-white text-3xl font-bold">
                   ${formData.amount.toLocaleString()}
                 </p>
+                <p className="text-gray-400 text-sm capitalize mt-1">
+                  {formData.payment_method === "efectivo"
+                    ? "Efectivo"
+                    : "Transferencia"}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-gray-400 text-sm">
                   Plan {planLabels[formData.plan_type] || formData.plan_type}
                 </p>
                 <p className="text-gray-400 text-sm">
-                  Válido hasta{" "}
+                  Valido hasta{" "}
                   {calculateEndDate(formData.start_date, formData.plan_type)}
                 </p>
               </div>
@@ -269,8 +301,8 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
 
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
           <p className="text-blue-300 text-sm">
-            ℹ️ <strong>Nota:</strong> El alumno ingresará con su DNI (
-            {formData.dni || "sin definir"}) y la contraseña que configures.
+            El alumno ingresara con su DNI ({formData.dni || "sin definir"}) y
+            la contrasena que configures.
           </p>
         </div>
 
