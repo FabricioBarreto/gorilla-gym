@@ -1,6 +1,5 @@
 // ============================================================
 // ARCHIVO: app/api/upload/images/route.ts
-// POST - Subir imagenes a Supabase Storage
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/supabase-server";
@@ -13,7 +12,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { images, bucket = "exercise-images" } = await req.json();
+    const body = await req.json();
+    const { images, bucket = "exercise-images" } = body;
+
+    console.log("[upload] images count:", images?.length);
+    console.log(
+      "[upload] SUPABASE_URL:",
+      process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30),
+    );
+    console.log(
+      "[upload] SERVICE_KEY exists:",
+      !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
@@ -25,6 +35,16 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+
+    // Test de conexion a Supabase
+    const { data: buckets, error: bucketsError } =
+      await supabase.storage.listBuckets();
+    console.log(
+      "[upload] buckets:",
+      buckets?.map((b) => b.name),
+      "error:",
+      bucketsError?.message,
     );
 
     const urls: string[] = [];
@@ -41,25 +61,34 @@ export async function POST(req: NextRequest) {
       const ext = mimeType.split("/")[1] || "jpg";
       const filename = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
 
-      const { error } = await supabase.storage
+      console.log(
+        "[upload] uploading:",
+        filename,
+        "size:",
+        buffer.length,
+        "bytes",
+      );
+
+      const { data, error } = await supabase.storage
         .from(bucket)
         .upload(filename, buffer, {
           contentType: mimeType,
           upsert: false,
         });
 
+      console.log("[upload] result:", data, "error:", error?.message);
+
       if (error) throw new Error(error.message);
 
       const { data: publicData } = supabase.storage
         .from(bucket)
         .getPublicUrl(filename);
-
       urls.push(publicData.publicUrl);
     }
 
     return NextResponse.json({ success: true, urls });
   } catch (error: any) {
-    console.error("Upload error:", error);
+    console.error("[upload] FATAL:", error.message, error.cause);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
