@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+// Guardar el prompt GLOBALMENTE para no perderlo entre renders
+let globalInstallPrompt: any = null;
+
 export function InstallAppButton() {
-  const [prompt, setPrompt] = useState<any>(null);
+  const [ready, setReady] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [showIOSModal, setShowIOSModal] = useState(false);
 
   useEffect(() => {
     const ios =
@@ -16,13 +19,23 @@ export function InstallAppButton() {
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
     setIsInstalled(standalone);
 
+    // Si ya tenemos el prompt guardado globalmente, usarlo
+    if (globalInstallPrompt) {
+      setReady(true);
+      return;
+    }
+
     const handler = (e: Event) => {
       e.preventDefault();
-      setPrompt(e);
+      globalInstallPrompt = e;
+      setReady(true);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", () => setIsInstalled(true));
+    window.addEventListener("appinstalled", () => {
+      globalInstallPrompt = null;
+      setIsInstalled(true);
+    });
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
@@ -30,28 +43,36 @@ export function InstallAppButton() {
   }, []);
 
   const handleClick = async () => {
+    // Ya instalada → recargar para actualizar
     if (isInstalled) {
-      // Si ya está instalada → forzar recarga para actualizar
       window.location.reload();
       return;
     }
 
+    // iOS → mostrar instrucciones
     if (isIOS) {
-      setShowModal(true);
+      setShowIOSModal(true);
       return;
     }
 
-    if (prompt) {
-      prompt.prompt();
-      const { outcome } = await prompt.userChoice;
+    // Android con prompt → instalar directo
+    if (globalInstallPrompt) {
+      globalInstallPrompt.prompt();
+      const { outcome } = await globalInstallPrompt.userChoice;
       if (outcome === "accepted") {
-        setPrompt(null);
+        globalInstallPrompt = null;
+        setReady(false);
         setIsInstalled(true);
       }
-    } else {
-      setShowModal(true);
+      return;
     }
+
+    // Android sin prompt (no debería pasar, pero por si acaso)
+    setShowIOSModal(true);
   };
+
+  // No mostrar en Android si no hay prompt y no está instalada
+  if (!isIOS && !isInstalled && !ready) return null;
 
   return (
     <>
@@ -62,9 +83,6 @@ export function InstallAppButton() {
             ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-600/30"
             : "bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/30"
         }`}
-        title={
-          isInstalled ? "Actualizar app" : "Instalar app en tu dispositivo"
-        }
       >
         {isInstalled ? (
           <>
@@ -103,10 +121,11 @@ export function InstallAppButton() {
         )}
       </button>
 
-      {showModal && (
+      {/* Modal solo para iOS */}
+      {showIOSModal && (
         <div
           className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center p-4"
-          onClick={() => setShowModal(false)}
+          onClick={() => setShowIOSModal(false)}
         >
           <div
             className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-sm mb-4"
@@ -120,97 +139,59 @@ export function InstallAppButton() {
                   alt="Gorilla GYM"
                 />
                 <h3 className="text-white font-bold text-lg">
-                  {isIOS ? "Instalar en iPhone" : "Instalar la app"}
+                  Instalar en iPhone
                 </h3>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowIOSModal(false)}
                 className="text-gray-400 hover:text-white text-xl"
               >
                 ✕
               </button>
             </div>
 
-            {isIOS ? (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">1️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      Tocá el botón compartir{" "}
-                      <span className="text-blue-400">□↑</span>
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      En la barra inferior de Safari
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">2️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      "Agregar a pantalla de inicio"
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      Scrolleá hacia abajo en el menú
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">3️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      Tocá "Agregar"
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      La app aparece en tu pantalla de inicio
-                    </p>
-                  </div>
-                </div>
-                <p className="text-gray-500 text-xs text-center mt-2">
-                  ⚠️ Solo funciona desde Safari
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">1️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      Tocá los 3 puntos ⋮
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      En la esquina superior derecha de Chrome
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">2️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      "Agregar a pantalla de inicio"
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      O "Instalar app"
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                  <span className="text-2xl flex-shrink-0">3️⃣</span>
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      Tocá "Instalar"
-                    </p>
-                    <p className="text-gray-400 text-xs mt-0.5">
-                      La app aparece en tu pantalla de inicio
-                    </p>
-                  </div>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                <span className="text-2xl flex-shrink-0">1️⃣</span>
+                <div>
+                  <p className="text-white text-sm font-medium">
+                    Tocá el botón compartir{" "}
+                    <span className="text-blue-400">□↑</span>
+                  </p>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    En la barra inferior de Safari
+                  </p>
                 </div>
               </div>
-            )}
+              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                <span className="text-2xl flex-shrink-0">2️⃣</span>
+                <div>
+                  <p className="text-white text-sm font-medium">
+                    "Agregar a pantalla de inicio"
+                  </p>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    Scrolleá hacia abajo en el menú
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                <span className="text-2xl flex-shrink-0">3️⃣</span>
+                <div>
+                  <p className="text-white text-sm font-medium">
+                    Tocá "Agregar"
+                  </p>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    La app aparece en tu pantalla de inicio
+                  </p>
+                </div>
+              </div>
+              <p className="text-gray-500 text-xs text-center mt-2">
+                ⚠️ Solo funciona desde Safari
+              </p>
+            </div>
 
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => setShowIOSModal(false)}
               className="w-full mt-5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               Entendido
