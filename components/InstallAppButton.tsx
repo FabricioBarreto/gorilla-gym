@@ -2,29 +2,19 @@
 
 import { useEffect, useState } from "react";
 
-function isIOS() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-  );
-}
-
-function isInStandaloneMode() {
-  return window.matchMedia("(display-mode: standalone)").matches;
-}
-
 export function InstallAppButton() {
   const [prompt, setPrompt] = useState<any>(null);
-  const [installed, setInstalled] = useState(false);
-  const [showIOSModal, setShowIOSModal] = useState(false);
-  const [ios, setIos] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    if (isInStandaloneMode()) {
-      setInstalled(true);
-      return;
-    }
+    const ios =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
 
-    setIos(isIOS());
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    setIsInstalled(standalone);
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -32,58 +22,91 @@ export function InstallAppButton() {
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", () => setInstalled(true));
+    window.addEventListener("appinstalled", () => setIsInstalled(true));
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
     };
   }, []);
 
-  const handleInstall = async () => {
-    if (ios) {
-      setShowIOSModal(true);
+  const handleClick = async () => {
+    if (isInstalled) {
+      // Si ya está instalada → forzar recarga para actualizar
+      window.location.reload();
       return;
     }
-    if (!prompt) return;
-    prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") {
-      setPrompt(null);
-      setInstalled(true);
+
+    if (isIOS) {
+      setShowModal(true);
+      return;
+    }
+
+    if (prompt) {
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") {
+        setPrompt(null);
+        setIsInstalled(true);
+      }
+    } else {
+      setShowModal(true);
     }
   };
-
-  if (installed) return null;
-  if (!ios && !prompt) return null;
 
   return (
     <>
       <button
-        onClick={handleInstall}
-        className="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/30 transition-colors"
-        title="Instalar app en tu dispositivo"
+        onClick={handleClick}
+        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+          isInstalled
+            ? "bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border-blue-600/30"
+            : "bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/30"
+        }`}
+        title={
+          isInstalled ? "Actualizar app" : "Instalar app en tu dispositivo"
+        }
       >
-        <svg
-          className="w-3 h-3"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-          />
-        </svg>
-        <span>Instalar app</span>
+        {isInstalled ? (
+          <>
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span>Actualizar</span>
+          </>
+        ) : (
+          <>
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+            <span>Instalar app</span>
+          </>
+        )}
       </button>
 
-      {/* Modal instrucciones iOS */}
-      {showIOSModal && (
+      {showModal && (
         <div
           className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center p-4"
-          onClick={() => setShowIOSModal(false)}
+          onClick={() => setShowModal(false)}
         >
           <div
             className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-sm mb-4"
@@ -97,63 +120,98 @@ export function InstallAppButton() {
                   alt="Gorilla GYM"
                 />
                 <h3 className="text-white font-bold text-lg">
-                  Instalar en iPhone
+                  {isIOS ? "Instalar en iPhone" : "Instalar la app"}
                 </h3>
               </div>
               <button
-                onClick={() => setShowIOSModal(false)}
+                onClick={() => setShowModal(false)}
                 className="text-gray-400 hover:text-white text-xl"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                <span className="text-2xl flex-shrink-0">1️⃣</span>
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    Tocá el botón compartir{" "}
-                    <span className="text-blue-400">□↑</span>
-                  </p>
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    En la barra inferior de Safari
-                  </p>
+            {isIOS ? (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">1️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      Tocá el botón compartir{" "}
+                      <span className="text-blue-400">□↑</span>
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      En la barra inferior de Safari
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">2️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      "Agregar a pantalla de inicio"
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      Scrolleá hacia abajo en el menú
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">3️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      Tocá "Agregar"
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      La app aparece en tu pantalla de inicio
+                    </p>
+                  </div>
+                </div>
+                <p className="text-gray-500 text-xs text-center mt-2">
+                  ⚠️ Solo funciona desde Safari
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">1️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      Tocá los 3 puntos ⋮
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      En la esquina superior derecha de Chrome
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">2️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      "Agregar a pantalla de inicio"
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      O "Instalar app"
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
+                  <span className="text-2xl flex-shrink-0">3️⃣</span>
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      Tocá "Instalar"
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">
+                      La app aparece en tu pantalla de inicio
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                <span className="text-2xl flex-shrink-0">2️⃣</span>
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    "Agregar a pantalla de inicio"
-                  </p>
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    Scrolleá hacia abajo en el menú
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4 bg-gray-700/50 rounded-lg p-3">
-                <span className="text-2xl flex-shrink-0">3️⃣</span>
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    Tocá "Agregar"
-                  </p>
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    La app aparece en tu pantalla de inicio
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-gray-500 text-xs text-center mt-4">
-              ⚠️ Solo funciona desde Safari
-            </p>
+            )}
 
             <button
-              onClick={() => setShowIOSModal(false)}
-              className="w-full mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+              onClick={() => setShowModal(false)}
+              className="w-full mt-5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               Entendido
             </button>
