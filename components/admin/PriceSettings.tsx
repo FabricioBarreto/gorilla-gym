@@ -21,18 +21,24 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
   const planLabels: Record<string, string> = {
+    diario: "Día (1 día)",
+    semanal: "Semanal (7 días)",
     quincenal: "Quincenal (15 días)",
     mensual: "Mensual (30 días)",
-    trimestral: "Trimestral (90 días)",
-    anual: "Anual (365 días)",
   };
+
   const planIcons: Record<string, string> = {
-    quincenal: "📅",
-    mensual: "📆",
-    trimestral: "🗓️",
-    anual: "📋",
+    diario: "🎟️",
+    semanal: "📅",
+    quincenal: "📆",
+    mensual: "🗓️",
   };
+
+  // Orden de visualización
+  const planOrder = ["diario", "semanal", "quincenal", "mensual"];
+
   const [localPrices, setLocalPrices] = useState<Record<string, number>>(
     prices.reduce((acc, p) => ({ ...acc, [p.plan_type]: p.price }), {}),
   );
@@ -68,6 +74,19 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
     setError(null);
   };
 
+  // Mostrar en orden definido, ignorar planes viejos (trimestral/anual)
+  const visiblePrices = planOrder.map((planType) => {
+    const existing = prices.find((p) => p.plan_type === planType);
+    return (
+      existing || {
+        id: planType,
+        plan_type: planType,
+        price: 0,
+        updated_at: new Date().toISOString(),
+      }
+    );
+  });
+
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
@@ -83,6 +102,7 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
           </button>
         )}
       </div>
+
       {error && (
         <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
           <p className="text-red-400 text-sm">{error}</p>
@@ -95,17 +115,24 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
           </p>
         </div>
       )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {prices.map((price) => (
+        {visiblePrices.map((price) => (
           <div
             key={price.plan_type}
-            className={`rounded-lg p-5 border-2 transition-all ${editing ? "border-blue-500 bg-blue-500/5" : "border-gray-600 bg-gray-700/30"}`}
+            className={`rounded-lg p-5 border-2 transition-all ${
+              editing
+                ? "border-blue-500 bg-blue-500/5"
+                : "border-gray-600 bg-gray-700/30"
+            }`}
           >
             <div className="flex items-center space-x-3 mb-4">
-              <span className="text-3xl">{planIcons[price.plan_type]}</span>
+              <span className="text-3xl">
+                {planIcons[price.plan_type] || "💰"}
+              </span>
               <div>
                 <h3 className="text-white font-bold text-lg">
-                  {planLabels[price.plan_type]}
+                  {planLabels[price.plan_type] || price.plan_type}
                 </h3>
                 <p className="text-gray-400 text-xs">
                   Última actualización:{" "}
@@ -121,7 +148,7 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
                 <input
                   type="number"
                   min="0"
-                  step="1000"
+                  step="500"
                   value={localPrices[price.plan_type] || 0}
                   onChange={(e) =>
                     setLocalPrices({
@@ -136,13 +163,17 @@ export function PriceSettings({ prices }: PriceSettingsProps) {
               <div className="bg-gray-700/50 rounded-lg p-4">
                 <p className="text-gray-400 text-sm mb-1">Precio Actual</p>
                 <p className="text-green-400 font-bold text-3xl">
-                  ${price.price.toLocaleString()}
+                  $
+                  {(
+                    localPrices[price.plan_type] || price.price
+                  ).toLocaleString()}
                 </p>
               </div>
             )}
           </div>
         ))}
       </div>
+
       {editing && (
         <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-700">
           <button

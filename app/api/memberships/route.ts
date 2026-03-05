@@ -18,20 +18,19 @@ export async function POST(req: NextRequest) {
 
     const today = new Date();
     const end = new Date(today);
-    if (planType === "quincenal") end.setDate(end.getDate() + 15);
+
+    if (planType === "diario") end.setDate(end.getDate() + 1);
+    else if (planType === "semanal") end.setDate(end.getDate() + 7);
+    else if (planType === "quincenal") end.setDate(end.getDate() + 15);
     else if (planType === "mensual") end.setMonth(end.getMonth() + 1);
-    else if (planType === "trimestral") end.setMonth(end.getMonth() + 3);
-    else if (planType === "anual") end.setFullYear(end.getFullYear() + 1);
 
     await prisma.$transaction(async (tx) => {
-      // Marcar membresía anterior como expirada
       if (currentMembershipId) {
         await tx.membership.update({
           where: { id: currentMembershipId },
           data: { status: "expired" },
         });
       }
-      // Crear nueva
       await tx.membership.create({
         data: {
           userId,
