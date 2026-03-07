@@ -35,8 +35,8 @@ export function MemberMembershipSimple({
   const planLabels: Record<string, string> = {
     quincenal: "Quincenal",
     mensual: "Mensual",
-    trimestral: "Trimestral",
-    anual: "Anual",
+    diario: "Día",
+    semanal: "Semanal",
   };
 
   const planDurations: Record<string, number> = {

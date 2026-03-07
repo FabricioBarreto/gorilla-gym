@@ -67,16 +67,16 @@ export function MembershipStatus({ membership }: MembershipStatusProps) {
   const planLabels: Record<string, string> = {
     quincenal: "Quincenal",
     mensual: "Mensual",
-    trimestral: "Trimestral",
-    anual: "Anual",
+    diario: "Día",
+    semanal: "Semanal",
   };
 
   // Montos por plan
   const planMontos: Record<string, number> = {
     quincenal: 8000,
     mensual: 15000,
-    trimestral: 40000,
-    anual: 150000,
+    diario: 2000,
+    semanal: 6000,
   };
 
   return (

@@ -41,12 +41,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Calcular fecha de vencimiento
-    const start = new Date(start_date);
+    const start = new Date(start_date + "T12:00:00");
     const end = new Date(start);
-    if (plan_type === "mensual") end.setMonth(end.getMonth() + 1);
-    else if (plan_type === "trimestral") end.setMonth(end.getMonth() + 3);
-    else if (plan_type === "anual") end.setFullYear(end.getFullYear() + 1);
+    if (plan_type === "diario") end.setDate(end.getDate() + 1);
+    else if (plan_type === "semanal") end.setDate(end.getDate() + 7);
     else if (plan_type === "quincenal") end.setDate(end.getDate() + 15);
+    else if (plan_type === "mensual") end.setMonth(end.getMonth() + 1);
 
     // Hash password y crear perfil + membresía en transacción
     const hashedPassword = await bcrypt.hash(password, 10);

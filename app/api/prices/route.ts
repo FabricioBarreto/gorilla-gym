@@ -14,7 +14,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const { prices } = await req.json();
-    // prices: { mensual: 15000, trimestral: 40000, ... }
+    // prices: { mensual: 15000, diario: 2000, ... }
 
     await Promise.all(
       Object.entries(prices).map(([planType, price]) =>

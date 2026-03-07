@@ -13,17 +13,17 @@ interface NewMemberFormProps {
 }
 
 const planDurations: Record<string, number> = {
+  diario: 1,
+  semanal: 7,
   quincenal: 15,
   mensual: 30,
-  trimestral: 90,
-  anual: 365,
 };
 
 const planLabels: Record<string, string> = {
+  diario: "Día",
+  semanal: "Semanal",
   quincenal: "Quincenal",
   mensual: "Mensual",
-  trimestral: "Trimestral",
-  anual: "Anual",
 };
 
 export function NewMemberForm({ plans }: NewMemberFormProps) {
@@ -58,15 +58,10 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
 
   const calculateEndDate = (startDate: string, planType: string) => {
     const end = new Date(startDate + "T12:00:00");
-    const days = planDurations[planType];
-    if (days) {
-      end.setDate(end.getDate() + days);
-    } else if (planType === "mensual") {
-      end.setMonth(end.getMonth() + 1);
-    } else if (planType === "trimestral") {
-      end.setMonth(end.getMonth() + 3);
-    } else if (planType === "anual") {
-      end.setFullYear(end.getFullYear() + 1);
+    if (planType === "mensual") end.setMonth(end.getMonth() + 1);
+    else {
+      const days = planDurations[planType];
+      if (days) end.setDate(end.getDate() + days);
     }
     return end.toISOString().split("T")[0];
   };
@@ -212,10 +207,10 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
               <input
                 type="text"
                 disabled
-                value={calculateEndDate(
-                  formData.start_date,
-                  formData.plan_type,
-                )}
+                value={new Date(
+                  calculateEndDate(formData.start_date, formData.plan_type) +
+                    "T12:00:00",
+                ).toLocaleDateString("es-AR")}
                 className="w-full px-4 py-2 bg-gray-600 border border-gray-600 rounded-lg text-gray-300 cursor-not-allowed"
               />
             </div>
@@ -227,7 +222,11 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                 key={plan.plan_type}
                 type="button"
                 onClick={() => handlePlanChange(plan.plan_type)}
-                className={`p-4 rounded-lg border-2 transition-all ${formData.plan_type === plan.plan_type ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700 hover:border-gray-500"}`}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.plan_type === plan.plan_type
+                    ? "border-green-500 bg-green-500/10"
+                    : "border-gray-600 bg-gray-700 hover:border-gray-500"
+                }`}
               >
                 <div className="text-center">
                   <p className="text-white font-bold capitalize mb-2">
@@ -238,7 +237,8 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   </p>
                   {planDurations[plan.plan_type] && (
                     <p className="text-gray-400 text-xs mt-1">
-                      {planDurations[plan.plan_type]} dias
+                      {planDurations[plan.plan_type]} día
+                      {planDurations[plan.plan_type] !== 1 ? "s" : ""}
                     </p>
                   )}
                 </div>
@@ -258,7 +258,11 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                 onClick={() =>
                   setFormData({ ...formData, payment_method: method })
                 }
-                className={`p-4 rounded-lg border-2 transition-all ${formData.payment_method === method ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.payment_method === method
+                    ? "border-green-500 bg-green-500/10"
+                    : "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                }`}
               >
                 <div className="flex items-center justify-center space-x-2">
                   <span className="text-white font-medium capitalize">
@@ -291,8 +295,11 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
                   Plan {planLabels[formData.plan_type] || formData.plan_type}
                 </p>
                 <p className="text-gray-400 text-sm">
-                  Valido hasta{" "}
-                  {calculateEndDate(formData.start_date, formData.plan_type)}
+                  Válido hasta{" "}
+                  {new Date(
+                    calculateEndDate(formData.start_date, formData.plan_type) +
+                      "T12:00:00",
+                  ).toLocaleDateString("es-AR")}
                 </p>
               </div>
             </div>
@@ -301,8 +308,8 @@ export function NewMemberForm({ plans }: NewMemberFormProps) {
 
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
           <p className="text-blue-300 text-sm">
-            El alumno ingresara con su DNI ({formData.dni || "sin definir"}) y
-            la contrasena que configures.
+            El alumno ingresará con su DNI ({formData.dni || "sin definir"}) y
+            la contraseña que configures.
           </p>
         </div>
 

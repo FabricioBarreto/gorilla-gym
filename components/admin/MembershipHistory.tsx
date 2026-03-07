@@ -22,15 +22,15 @@ export function MembershipHistory({
   const planLabels: Record<string, string> = {
     quincenal: "Quincenal",
     mensual: "Mensual",
-    trimestral: "Trimestral",
-    anual: "Anual",
+    diario: "Día",
+    semanal: "Semanal",
   };
 
   const planPrices: Record<string, number> = {
     quincenal: 8000,
     mensual: 15000,
-    trimestral: 40000,
-    anual: 150000,
+    diario: 2000,
+    semanal: 6000,
   };
 
   const paymentMethodLabels: Record<string, string> = {

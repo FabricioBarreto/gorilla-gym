@@ -60,10 +60,10 @@ export default async function AdminDashboard() {
     }),
   ]);
 
-  // Construir mapa de precios
+  // Construir mapa de precios — fallback con nuevos planes
   const prices: Record<string, number> = pricesData.reduce(
     (acc, p) => ({ ...acc, [p.planType]: p.price }),
-    { mensual: 15000, trimestral: 40000, anual: 150000 },
+    { diario: 2000, semanal: 6000, quincenal: 10000, mensual: 18000 },
   );
 
   const monthlyRevenue = monthlyMemberships.reduce(

@@ -81,8 +81,8 @@ export function MembersList({ members }: MembersListProps) {
   const planLabels: Record<string, string> = {
     quincenal: "Quincenal",
     mensual: "Mensual",
-    trimestral: "Trimestral",
-    anual: "Anual",
+    diario: "Día",
+    semanal: "Semanal",
   };
 
   // Filtrar por búsqueda
