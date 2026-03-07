@@ -25,32 +25,37 @@ export function MemberMembershipSimple({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState("mensual");
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
 
-  const planPrices = {
-    quincenal: 8000,
-    mensual: 15000,
-    trimestral: 40000,
-    anual: 150000,
+  const planPrices: Record<string, number> = {
+    diario: 2000,
+    semanal: 6000,
+    quincenal: 10000,
+    mensual: 18000,
   };
-  const planLabels = {
-    quincenal: "Quincenal",
-    mensual: "Mensual",
-    trimestral: "Trimestral",
-    anual: "Anual",
+
+  const planLabels: Record<string, string> = {
+    diario: "Día (1 día)",
+    semanal: "Semanal (7 días)",
+    quincenal: "Quincenal (15 días)",
+    mensual: "Mensual (30 días)",
   };
-  const planDurations = {
+
+  const planDurations: Record<string, number> = {
+    diario: 1,
+    semanal: 7,
     quincenal: 15,
     mensual: 30,
-    trimestral: 90,
-    anual: 365,
   };
 
-  const calculateEndDate = (planType: string) => {
-    const end = new Date();
-    if (planType === "quincenal") end.setDate(end.getDate() + 15);
+  const calculateEndDate = (planType: string, from: string) => {
+    const end = new Date(from + "T12:00:00");
+    if (planType === "diario") end.setDate(end.getDate() + 1);
+    else if (planType === "semanal") end.setDate(end.getDate() + 7);
+    else if (planType === "quincenal") end.setDate(end.getDate() + 15);
     else if (planType === "mensual") end.setMonth(end.getMonth() + 1);
-    else if (planType === "trimestral") end.setMonth(end.getMonth() + 3);
-    else end.setFullYear(end.getFullYear() + 1);
     return end.toISOString().split("T")[0];
   };
 
@@ -64,6 +69,7 @@ export function MemberMembershipSimple({
         body: JSON.stringify({
           userId: memberId,
           planType: selectedPlan,
+          startDate: startDate,
           currentMembershipId: membership?.id || null,
         }),
       });
@@ -112,6 +118,7 @@ export function MemberMembershipSimple({
 
   const status = getStatusDisplay();
   const daysRemaining = getDaysRemaining();
+  const endDatePreview = calculateEndDate(selectedPlan, startDate);
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
@@ -134,30 +141,50 @@ export function MemberMembershipSimple({
       )}
 
       {showRenewForm ? (
-        <div className="space-y-6">
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <p className="text-blue-300 text-sm">
-              ℹ️ Selecciona el tipo de membresía. La fecha de inicio será hoy.
+        <div className="space-y-5">
+          {/* Fecha de inicio editable */}
+          <div className="bg-gray-700/50 rounded-lg p-4">
+            <label className="block text-gray-300 text-sm font-medium mb-2">
+              📅 Fecha de inicio
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <p className="text-gray-400 text-xs mt-2">
+              Podés cambiar la fecha si el pago corresponde a otro día
             </p>
           </div>
+
+          {/* Selector de plan */}
           <div className="space-y-3">
             {Object.entries(planPrices).map(([plan, price]) => (
               <button
                 key={plan}
                 type="button"
                 onClick={() => setSelectedPlan(plan)}
-                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${selectedPlan === plan ? "border-green-500 bg-green-500/10" : "border-gray-600 bg-gray-700/50 hover:border-gray-500"}`}
+                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                  selectedPlan === plan
+                    ? "border-green-500 bg-green-500/10"
+                    : "border-gray-600 bg-gray-700/50 hover:border-gray-500"
+                }`}
               >
                 <div className="flex items-center space-x-3 mb-2">
                   <span
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === plan ? "border-green-500 bg-green-500" : "border-gray-500"}`}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                      selectedPlan === plan
+                        ? "border-green-500 bg-green-500"
+                        : "border-gray-500"
+                    }`}
                   >
                     {selectedPlan === plan && (
                       <span className="text-white text-xs">✓</span>
                     )}
                   </span>
                   <p className="text-white font-bold text-lg">
-                    {planLabels[plan as keyof typeof planLabels]}
+                    {planLabels[plan]}
                   </p>
                 </div>
                 <div className="ml-8 space-y-1">
@@ -165,24 +192,28 @@ export function MemberMembershipSimple({
                     ${price.toLocaleString()}
                   </p>
                   <p className="text-gray-400 text-sm">
-                    Duración:{" "}
-                    {planDurations[plan as keyof typeof planDurations]} días
+                    Duración: {planDurations[plan]} día
+                    {planDurations[plan] !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-gray-400 text-sm">
-                    Vence:{" "}
-                    {new Date(calculateEndDate(plan)).toLocaleDateString(
-                      "es-AR",
-                    )}
-                  </p>
+                  {selectedPlan === plan && (
+                    <p className="text-blue-400 text-sm font-medium">
+                      Vence:{" "}
+                      {new Date(
+                        endDatePreview + "T12:00:00",
+                      ).toLocaleDateString("es-AR")}
+                    </p>
+                  )}
                 </div>
               </button>
             ))}
           </div>
+
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
             <button
               onClick={() => {
                 setShowRenewForm(false);
                 setError(null);
+                setStartDate(new Date().toISOString().split("T")[0]);
               }}
               disabled={loading}
               className="px-4 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50"
@@ -205,7 +236,13 @@ export function MemberMembershipSimple({
       ) : membership ? (
         <div className="space-y-6">
           <div
-            className={`rounded-lg p-6 text-center border-2 ${daysRemaining! < 0 ? "bg-red-500/10 border-red-500" : daysRemaining! <= 3 ? "bg-orange-500/10 border-orange-500" : "bg-green-500/10 border-green-500"}`}
+            className={`rounded-lg p-6 text-center border-2 ${
+              daysRemaining! < 0
+                ? "bg-red-500/10 border-red-500"
+                : daysRemaining! <= 3
+                  ? "bg-orange-500/10 border-orange-500"
+                  : "bg-green-500/10 border-green-500"
+            }`}
           >
             <p className="text-gray-300 text-sm mb-2">Estado de Membresía</p>
             <p className={`text-4xl font-bold mb-2 ${status.color}`}>
@@ -219,13 +256,10 @@ export function MemberMembershipSimple({
             <div className="bg-gray-700/50 rounded-lg p-4">
               <p className="text-gray-400 text-sm mb-1">Plan</p>
               <p className="text-white font-bold text-lg">
-                {planLabels[membership.plan_type as keyof typeof planLabels]}
+                {planLabels[membership.plan_type] || membership.plan_type}
               </p>
               <p className="text-green-400 font-semibold">
-                $
-                {planPrices[
-                  membership.plan_type as keyof typeof planPrices
-                ]?.toLocaleString()}
+                ${planPrices[membership.plan_type]?.toLocaleString() || "-"}
               </p>
             </div>
             <div className="bg-gray-700/50 rounded-lg p-4">

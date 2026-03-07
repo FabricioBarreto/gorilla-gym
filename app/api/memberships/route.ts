@@ -13,10 +13,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { userId, planType, paymentMethod, currentMembershipId } =
+    const { userId, planType, paymentMethod, currentMembershipId, startDate } =
       await req.json();
 
-    const today = new Date();
+    const today = startDate ? new Date(startDate + "T12:00:00") : new Date();
     const end = new Date(today);
 
     if (planType === "diario") end.setDate(end.getDate() + 1);
